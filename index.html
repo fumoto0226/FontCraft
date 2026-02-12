@@ -1,0 +1,2375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FontCraft | 自制字体工坊</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- OpenType.js for font generation -->
+    <script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Comic Neue', 'Inter', sans-serif;
+            background-color: #FFFBEB; /* Amber 50 */
+            color: #18181B; /* Zinc 900 */
+            background-image: radial-gradient(#FCD34D 1px, transparent 1px);
+            background-size: 20px 20px;
+            overflow-x: hidden; /* Prevent horizontal scroll */
+            touch-action: pan-y; /* Improve touch handling */
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 12px; }
+        ::-webkit-scrollbar-track { background: #FFFBEB; border-left: 2px solid black; }
+        ::-webkit-scrollbar-thumb { background: #FBBF24; border: 2px solid black; border-radius: 99px; }
+        ::-webkit-scrollbar-thumb:hover { background: #F59E0B; }
+
+        /* Neo-brutalism / Cartoon Utilities */
+        .cartoon-card {
+            background-color: white;
+            border: 3px solid #000;
+            box-shadow: 6px 6px 0px 0px #000;
+            border-radius: 1rem;
+        }
+
+        .cartoon-btn {
+            transition: all 0.1s;
+            border: 2px solid #000;
+            box-shadow: 3px 3px 0px 0px #000;
+            cursor: pointer;
+            user-select: none;
+        }
+        .cartoon-btn:active:not(:disabled) {
+            transform: translate(3px, 3px);
+            box-shadow: 0px 0px 0px 0px #000;
+        }
+        .cartoon-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: #e2e8f0;
+            box-shadow: none;
+        }
+
+        .cartoon-input {
+            border: 2px solid #000;
+            box-shadow: 3px 3px 0px 0px #00000020;
+            transition: all 0.2s;
+            outline: none;
+        }
+        .cartoon-input:focus {
+            box-shadow: 3px 3px 0px 0px #000;
+        }
+
+        /* Char Picker Button States */
+        .char-btn.selected {
+            background-color: black;
+            color: white;
+            box-shadow: 4px 4px 0px 0px rgba(0,0,0,0.2);
+            transform: translateY(-4px);
+            border-color: black;
+            z-index: 10;
+        }
+
+        /* Utilities */
+        .hidden { display: none !important; }
+        .visible { display: block !important; }
+        .flex { display: flex !important; }
+        
+        /* Custom Confirm Dialog */
+        .confirm-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            animation: fadeIn 0.2s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
+        .confirm-dialog {
+            animation: slideUp 0.3s ease-out;
+        }
+
+        /* Hide desktop character picker only on small screens */
+        @media (max-width: 767px) {
+            .char-picker-desktop-only {
+                display: none;
+            }
+        }
+
+        /* Desktop navigation - show only on wider screens */
+        #nav-desktop {
+            display: none;
+        }
+        @media (min-width: 768px) {
+            #nav-desktop {
+                display: flex !important;
+            }
+        }
+
+        /* Mobile navigation - show only on narrow screens */
+        .mobile-nav-first-row {
+            display: flex;
+        }
+        @media (min-width: 768px) {
+            .mobile-nav-first-row {
+                display: none !important;
+            }
+        }
+        
+        .mobile-nav-second-row {
+            display: flex;
+        }
+        @media (min-width: 768px) {
+            .mobile-nav-second-row {
+                display: none !important;
+            }
+        }
+
+        /* Mobile character select button is inline on mobile, hidden on desktop */
+        @media (min-width: 768px) {
+            #btn-mobile-char-select {
+                display: none !important;
+            }
+        }
+        
+        /* Mobile navigation buttons - remove shadow on mobile */
+        @media (max-width: 767px) {
+            #nav-library-mobile,
+            #nav-draw-mobile,
+            #nav-preview-mobile {
+                box-shadow: none !important;
+            }
+        }
+        
+        /* Font library responsive layouts */
+        .mobile-layout {
+            display: block !important;
+        }
+        .desktop-layout {
+            display: none !important;
+        }
+        @media (min-width: 768px) {
+            .mobile-layout {
+                display: none !important;
+            }
+            .desktop-layout {
+                display: flex !important;
+            }
+        }
+        
+        /* Remove shadow from font library cards */
+        .no-shadow {
+            box-shadow: none !important;
+        }
+        
+        /* User info responsive layouts */
+        .user-info-mobile {
+            display: flex !important;
+        }
+        .user-info-desktop {
+            display: none !important;
+        }
+        @media (min-width: 768px) {
+            .user-info-mobile {
+                display: none !important;
+            }
+            .user-info-desktop {
+                display: flex !important;
+            }
+        }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0"
+  }
+}
+</script>
+</head>
+<body class="min-h-screen pb-20 selection:bg-yellow-300 selection:text-black">
+
+    <!-- Header -->
+    <header class="sticky top-0 z-50 bg-[#FFD700] border-b-4 border-black">
+        <div class="max-w-6xl mx-auto px-4 sm:px-6 h-14 md:h-20 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-10 h-10 md:w-12 md:h-12 bg-white border-2 border-black shadow-[3px_3px_0px_0px_#000] rounded-xl flex items-center justify-center text-black font-black text-xl md:text-2xl transform -rotate-3">
+                    Aa
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-2xl font-black tracking-tight text-black italic">FontCraft</h1>
+                </div>
+            </div>
+            
+            <nav id="nav-desktop" class="items-center gap-2 sm:gap-4">
+                <!-- Language Switcher (desktop & tablet) -->
+                <div class="relative group">
+                    <button id="btn-lang" class="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm cartoon-btn bg-white text-black min-w-[100px] justify-between">
+                        <div class="flex items-center gap-2">
+                            <i data-lucide="globe" width="16"></i>
+                            <span id="label-lang">English</span>
+                        </div>
+                        <i data-lucide="chevron-down" width="14"></i>
+                    </button>
+                    <!-- Dropdown -->
+                    <div id="dropdown-lang" class="hidden absolute top-full mt-2 right-0 w-32 bg-white border-2 border-black shadow-[4px_4px_0px_0px_#000] rounded-lg overflow-hidden z-50 flex-col">
+                        <button data-lang="en" class="px-4 py-3 text-left hover:bg-yellow-100 font-bold text-sm border-b-2 border-slate-100 last:border-0 flex items-center gap-2 w-full">
+                            <span>English</span>
+                        </button>
+                        <button data-lang="ja" class="px-4 py-3 text-left hover:bg-yellow-100 font-bold text-sm border-b-2 border-slate-100 last:border-0 flex items-center gap-2 w-full">
+                            <span>日本語</span>
+                        </button>
+                        <button data-lang="zh" class="px-4 py-3 text-left hover:bg-yellow-100 font-bold text-sm flex items-center gap-2 w-full">
+                            <span>中文</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Font Library Button (desktop & tablet) -->
+                <button id="nav-library" class="flex items-center gap-2 px-4 sm:px-6 py-2 rounded-lg font-bold text-sm cartoon-btn bg-[#4ADE80] text-black hover:brightness-110">
+                    <i data-lucide="library" width="18"></i> <span data-i18n="fontLibrary">字体库</span>
+                </button>
+
+                <!-- Divider -->
+                <div class="h-6 w-0.5 bg-black mx-2"></div>
+
+                <!-- Nav Buttons (desktop & tablet) -->
+                <button id="nav-draw" class="flex items-center gap-2 px-4 sm:px-6 py-2 rounded-lg font-bold text-sm cartoon-btn bg-white text-black">
+                    <i data-lucide="pen-tool" width="18"></i> <span data-i18n="draw">绘制</span>
+                </button>
+                <button id="nav-preview" class="flex items-center gap-2 px-4 sm:px-6 py-2 rounded-lg font-bold text-sm cartoon-btn bg-yellow-300 text-black/80 hover:bg-white">
+                    <i data-lucide="type" width="18"></i> <span data-i18n="previewExport">预览&导出</span>
+                </button>
+            </nav>
+            
+            <!-- Mobile Language Switcher (first row, right aligned) -->
+            <div class="mobile-nav-first-row flex-1 justify-end">
+                <div class="relative group">
+                    <button id="btn-lang-mobile" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs cartoon-btn bg-white text-black min-w-[80px] justify-between">
+                        <div class="flex items-center gap-1.5">
+                            <i data-lucide="globe" width="12"></i>
+                            <span id="label-lang-mobile">English</span>
+                        </div>
+                        <i data-lucide="chevron-down" width="10"></i>
+                    </button>
+                    <!-- Mobile Dropdown -->
+                    <div id="dropdown-lang-mobile" class="hidden absolute top-full mt-2 right-0 w-32 bg-white border-2 border-black shadow-[4px_4px_0px_0px_#000] rounded-lg overflow-hidden z-50 flex-col">
+                        <button data-lang="en" class="px-4 py-3 text-left hover:bg-yellow-100 font-bold text-sm border-b-2 border-slate-100 last:border-0 flex items-center gap-2 w-full">
+                            <span>English</span>
+                        </button>
+                        <button data-lang="ja" class="px-4 py-3 text-left hover:bg-yellow-100 font-bold text-sm border-b-2 border-slate-100 last:border-0 flex items-center gap-2 w-full">
+                            <span>日本語</span>
+                        </button>
+                        <button data-lang="zh" class="px-4 py-3 text-left hover:bg-yellow-100 font-bold text-sm flex items-center gap-2 w-full">
+                            <span>中文</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Mobile Secondary Navigation (only on small screens) -->
+        <div class="mobile-nav-second-row border-t-2 border-black/20 bg-[#FFD700]">
+            <div class="w-full px-4 py-1.5 flex items-center justify-end gap-2">
+                <!-- Font Library Button Mobile -->
+                <button id="nav-library-mobile" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs cartoon-btn bg-[#4ADE80] text-black hover:brightness-110">
+                    <i data-lucide="library" width="12"></i> <span data-i18n="fontLibrary">字体库</span>
+                </button>
+                
+                <!-- Divider -->
+                <div class="h-5 w-0.5 bg-black mx-0.5"></div>
+                
+                <!-- Draw / Preview Buttons Mobile -->
+                <button id="nav-draw-mobile" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-bold text-xs cartoon-btn bg-white text-black">
+                    <i data-lucide="pen-tool" width="14"></i> <span data-i18n="draw">绘制</span>
+                </button>
+                <button id="nav-preview-mobile" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-bold text-xs cartoon-btn bg-yellow-300 text-black/80 hover:bg-white">
+                    <i data-lucide="type" width="14"></i> <span data-i18n="previewExport">预览&导出</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-4 md:py-8 sm:py-12">
+        
+        <!-- View: Drawing -->
+        <div id="view-draw" class="grid md:grid-cols-12 gap-10 items-start">
+            
+            <!-- Column: Character Picker -->
+            <div class="md:col-span-7 lg:col-span-8 order-2 md:order-1 char-picker-desktop-only">
+                <div class="cartoon-card p-6 sm:p-8 relative">
+                    <!-- Decor -->
+                    <div class="absolute -top-6 -left-6 w-12 h-12 bg-[#60A5FA] rounded-full border-2 border-black z-0"></div>
+                    <div class="absolute -bottom-4 -right-4 w-0 h-0 border-l-[20px] border-l-transparent border-t-[30px] border-t-[#FF6B6B] border-r-[20px] border-r-transparent transform rotate-12"></div>
+
+                    <!-- Picker Header -->
+                    <div class="flex items-center justify-between mb-8 relative z-10">
+                        <div>
+                            <h2 class="text-3xl font-black text-black italic" data-i18n="characterLibrary">字符库</h2>
+                            <p class="text-slate-500 text-xs mt-1 font-bold" data-i18n="selectCharacterDesc">选择字符开始绘制</p>
+                        </div>
+                        <div class="flex items-stretch gap-3 h-12">
+                            <button id="btn-reset-library" class="cartoon-btn flex items-center justify-center gap-1.5 px-4 h-full rounded-lg bg-white text-black font-bold text-sm hover:bg-slate-50" title="重置字库">
+                                <i data-lucide="rotate-ccw" width="16"></i> <span data-i18n="reset">重置</span>
+                            </button>
+                            <div class="flex items-center gap-2 px-5 h-full rounded-lg bg-slate-100 border-2 border-black shadow-[2px_2px_0px_0px_#000] text-black">
+                                <span id="done-count" class="text-[#F59E0B] font-black text-3xl leading-none">0</span>
+                                <span class="text-xs font-bold self-center pt-1" data-i18n="done">完成</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Picker Content -->
+                    <div id="picker-container" class="relative z-10 space-y-8">
+                        <!-- Injected via JS -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Column: Drawing Canvas -->
+            <div class="md:col-span-5 lg:col-span-4 order-1 md:order-2 sticky top-24 sm:top-32">
+                <div class="cartoon-card p-4 md:p-6 flex flex-col gap-3 md:gap-5 w-full mx-auto relative">
+                    <!-- Badge (desktop only) -->
+                    <div class="hidden md:block absolute -top-4 -right-4 bg-[#FF6B6B] text-white font-black px-4 py-1 rounded-full border-2 border-black shadow-[2px_2px_0px_0px_#000] rotate-12 z-20">
+                        DRAW
+                    </div>
+
+                    <!-- Canvas Header (desktop only) -->
+                    <div class="hidden md:flex items-end justify-between w-full pb-3 border-b-2 border-dashed border-slate-300">
+                        <div>
+                            <h2 id="current-char-display" class="text-4xl font-black text-black font-sans">a</h2>
+                        </div>
+                        <button id="btn-toggle-guide" class="flex items-center gap-2 px-3 py-2 rounded-lg border-2 border-black transition-all bg-[#4ADE80] shadow-[2px_2px_0px_0px_#000]">
+                            <i id="icon-guide" data-lucide="eye" width="20"></i>
+                            <span class="font-bold text-sm text-black">参考</span>
+                        </button>
+                    </div>
+
+                    <!-- Canvas Area -->
+                    <div class="flex justify-center py-1 md:py-2">
+                        <div id="canvas-container" class="relative group select-none touch-none rounded-xl bg-white border-2 border-black shadow-[inset_0px_0px_10px_rgba(0,0,0,0.05)] overflow-hidden">
+                            <!-- SVG Canvas (square canvas for easy drawing) -->
+                            <div id="canvas-wrapper" class="md:w-[270px] md:h-[270px]" style="width: min(80vw, 300px); height: min(80vw, 300px);">
+                                <svg id="drawing-svg" viewBox="0 0 500 500" class="w-full h-full cursor-crosshair relative z-10" style="touch-action: none;">
+                                    <!-- Layers handled by JS -->
+                                    <image id="svg-bg-image" x="0" y="0" width="500" height="500" preserveAspectRatio="xMidYMid meet" style="display:none;"></image>
+                                    <text id="svg-guide-text" x="250" y="410" text-anchor="middle" fill="#1e293b" fill-opacity="0.15" font-size="430" font-family="sans-serif" font-weight="normal" style="pointer-events: none; user-select: none;">a</text>
+                                    <g id="svg-strokes"></g>
+                                    <path id="svg-current-path" d="" stroke="black" fill="none" stroke-linecap="round" stroke-linejoin="round"></path>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Controls -->
+                    <div class="flex items-center gap-2">
+                        <div class="flex-1 flex items-center gap-2 bg-slate-100 p-2 md:p-3 rounded-xl md:border-2 md:border-black md:shadow-[2px_2px_0px_0px_#000]">
+                            <span class="text-xs font-black uppercase text-slate-500 whitespace-nowrap" data-i18n="brush">笔刷</span>
+                            <input id="input-brush-slider" type="range" min="5" max="80" value="25" class="w-full h-2 bg-white rounded-full appearance-none cursor-pointer border-2 border-slate-300 accent-black">
+                            <input id="input-brush-number" type="number" min="5" max="80" value="25" class="w-12 md:w-14 px-1 py-1 text-xs md:text-sm font-bold border-2 border-slate-300 rounded-md text-center focus:border-black focus:outline-none">
+                        </div>
+                        <div class="w-10 h-10 md:w-[52px] md:h-[52px] flex items-center justify-center bg-white border-2 border-black rounded-xl shadow-[2px_2px_0px_0px_#000] shrink-0">
+                            <div id="brush-preview-dot" class="bg-black rounded-full transition-all duration-100" style="width: 18px; height: 18px;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex gap-2 md:gap-3 pt-1 md:pt-2">
+                        <!-- Mobile Guide Toggle (small square button, left side) -->
+                        <button id="btn-toggle-guide-mobile" class="md:hidden flex items-center justify-center w-12 h-12 rounded-xl font-bold cartoon-btn border-2 border-black transition-all bg-[#4ADE80] shadow-[2px_2px_0px_0px_#000]">
+                            <i id="icon-guide-mobile" data-lucide="eye" width="20"></i>
+                        </button>
+                        
+                        <!-- Clear and Undo buttons (swapped positions) -->
+                        <div class="flex-1 grid grid-cols-2 gap-2 md:gap-3">
+                            <button id="btn-clear" class="cartoon-btn bg-[#FF6B6B] text-white flex items-center justify-center gap-2 px-4 py-3 rounded-xl font-bold hover:brightness-110">
+                            <i data-lucide="trash-2" width="16"></i> <span data-i18n="clear">清除</span>
+                        </button>
+                            <button id="btn-undo" class="flex items-center justify-center gap-2 px-3 py-3 rounded-xl font-bold cartoon-btn bg-[#60A5FA] text-white enabled:hover:brightness-110 disabled:bg-[#94a3b8] disabled:cursor-not-allowed disabled:shadow-none" disabled>
+                                <i data-lucide="rotate-ccw" width="18"></i> <span data-i18n="undo">撤销</span>
+                        </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Mobile: Character Selection Button (below canvas, only on phones) -->
+                <button id="btn-mobile-char-select" class="md:hidden w-full mt-4 cartoon-btn bg-[#FCD34D] text-black px-6 py-4 rounded-xl shadow-[4px_4px_0px_0px_#000] hover:brightness-110 flex items-center justify-center gap-3 font-bold text-base">
+                    <i data-lucide="grid-3x3" width="20"></i>
+                    <span><span data-i18n="selectCharacter">选择字符</span>: <span id="mobile-current-char" class="font-black text-lg">a</span></span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Mobile: Character Picker Bottom Sheet (only on phones) -->
+        <div id="mobile-char-sheet" class="md:hidden fixed inset-0 z-50 pointer-events-none">
+            <!-- Backdrop -->
+            <div id="mobile-sheet-backdrop" class="absolute inset-0 bg-black/50 opacity-0 transition-opacity duration-300"></div>
+            
+            <!-- Sheet Content -->
+            <div id="mobile-sheet-content" class="absolute bottom-0 left-0 right-0 bg-[#FFFBEB] rounded-t-3xl border-t-4 border-l-4 border-r-4 border-black max-h-[70vh] translate-y-full transition-transform duration-300 overflow-hidden flex flex-col">
+                <!-- Sheet Header -->
+                <div class="flex items-center justify-between p-4 border-b-2 border-dashed border-black/20 bg-[#FCD34D] sticky top-0 z-10">
+                    <div>
+                        <h3 class="text-lg font-black text-black" data-i18n="selectCharacter">选择字符</h3>
+                        <p class="text-xs text-black/60 font-bold mt-0.5" data-i18n="selectCharacterDesc">点击字符开始绘制</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button id="btn-reset-all-mobile" class="cartoon-btn bg-[#FF6B6B] text-white p-2.5 rounded-lg hover:brightness-110">
+                            <i data-lucide="rotate-ccw" width="20"></i>
+                        </button>
+                        <button id="btn-close-mobile-sheet" class="cartoon-btn bg-white text-black p-2.5 rounded-lg hover:brightness-95">
+                            <i data-lucide="x" width="22"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Sheet Body (Scrollable) -->
+                <div class="flex-1 overflow-y-auto p-4">
+                    <div id="mobile-picker-container" class="space-y-6">
+                        <!-- Injected via JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- View: Preview -->
+        <div id="view-preview" class="hidden max-w-4xl mx-auto">
+            <div class="cartoon-card overflow-hidden">
+                <!-- Top Bar -->
+                <div class="p-8 pb-4 bg-[#FFFBEB] border-b-2 border-black border-dashed">
+                    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                        <div>
+                            <h2 class="text-3xl font-black text-black mb-2 italic transform -rotate-1" data-i18n="exportFont">导出字体</h2>
+                            <div class="flex items-center gap-3">
+                                <div class="h-4 w-40 bg-white border-2 border-black rounded-full overflow-hidden">
+                                    <div id="progress-bar" class="h-full bg-[#4ADE80] border-r-2 border-black" style="width: 0%"></div>
+                                </div>
+                                <span id="progress-text" class="text-xs font-black text-black">0<span data-i18n="percentComplete">% 完成</span></span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <!-- Mobile: Font name + download in same row -->
+                            <div class="flex md:hidden items-center gap-2 flex-1">
+                                <input id="input-font-name" type="text" value="MyFunFont" class="cartoon-input px-4 py-2 bg-white rounded-lg text-sm font-bold text-black flex-1" placeholder="字体名称">
+                                <button id="btn-download" class="cartoon-btn text-white flex items-center justify-center w-12 h-12 rounded-lg font-bold hover:brightness-110 shrink-0" style="background-color: rgb(57, 57, 57);">
+                                    <i data-lucide="download" width="20"></i>
+                                </button>
+                            </div>
+                            
+                            <!-- Desktop: original layout -->
+                            <input id="input-font-name-desktop" type="text" value="MyFunFont" class="hidden md:block cartoon-input px-4 py-2 bg-white rounded-lg text-sm font-bold text-black" placeholder="字体名称">
+                            
+                            <button id="btn-save-to-library" class="cartoon-btn bg-[#4ADE80] text-black flex items-center justify-center gap-2 px-6 py-2 rounded-lg font-bold hover:brightness-110">
+                                <i data-lucide="save" width="16"></i> <span data-i18n="saveToLibrary">保存到字体库</span>
+                            </button>
+                            <button id="btn-download-desktop" class="hidden md:flex cartoon-btn text-white items-center justify-center gap-2 px-6 py-2 rounded-lg font-bold hover:brightness-110" style="background-color: rgb(57, 57, 57);">
+                                <i data-lucide="download" width="16"></i> <span>下载字体</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview Content -->
+                <div class="p-8 bg-white">
+                    <div class="bg-slate-50 rounded-xl p-4 min-h-[240px] border-2 border-black shadow-[inset_0px_0px_20px_rgba(0,0,0,0.05)] relative overflow-hidden mb-6">
+                        <div id="preview-output" class="flex flex-wrap content-start">
+                            <!-- Preview Chars go here -->
+                        </div>
+                        </div>
+
+                    <div class="mb-4">
+                        <textarea id="input-preview-text" class="cartoon-input w-full p-4 rounded-xl text-slate-600 bg-white text-lg font-sans placeholder:text-slate-300" rows="8" placeholder="在此输入文字预览...">In 1984, Jack wrote a quick note about a quiet fox and a lazy dog. Lily asked, "Does this font feel clear and friendly?" Jack smiled: "Maybe, but check every letter."
+They typed a short line: Pack my box with five dozen liquor jugs, and fixed a quirky zebra story.
+For contact, Jack left an email: fafa27756@mail.com, and added, "Reply before 8:30, ok?"
+They tried simple marks like . , ! ? : ; ( ) [ ] { } - _ + = @ # & /
+If words look even and clean, the font works well.</textarea>
+                    </div>
+
+                    <div class="flex justify-end">
+                        <button id="btn-reset-preview-text" class="cartoon-btn bg-slate-500 text-white px-4 py-2 rounded-lg font-bold hover:brightness-110 flex items-center gap-2">
+                            <i data-lucide="rotate-ccw" width="16"></i>
+                            <span data-i18n="restoreContent">还原文字内容</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+                    </div>
+
+        <!-- View: Font Library -->
+        <div id="view-library" class="hidden max-w-4xl mx-auto">
+            <div class="cartoon-card overflow-hidden">
+                <!-- Top Bar -->
+                <div class="p-8 pb-6 bg-[#FFFBEB] border-b-2 border-black border-dashed">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-3xl font-black text-black mb-2 italic transform -rotate-1" data-i18n="fontLibraryTitle">字体库</h2>
+                            <p class="text-sm text-slate-600 font-bold" data-i18n="fontLibraryDesc">管理您保存的字体</p>
+                        </div>
+                        
+                        <!-- Auth UI -->
+                        <div id="auth-container">
+                            <!-- Login Button (shown when not logged in) -->
+                            <button id="btn-google-login" class="cartoon-btn bg-white text-black px-6 py-3 rounded-lg font-bold hover:brightness-95 items-center gap-3" style="display: flex;">
+                                <svg width="20" height="20" viewBox="0 0 24 24">
+                                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                                </svg>
+                                <span data-i18n="googleLogin">Google 登录</span>
+                            </button>
+                            
+                            <!-- User Info (shown when logged in) -->
+                            <div id="user-info" style="display: none;">
+                                <!-- Desktop: Full user info with name -->
+                                <div class="user-info-desktop items-center gap-4">
+                                    <div class="flex items-center gap-3 bg-white px-4 py-2 rounded-lg border-2 border-black shadow-[2px_2px_0px_0px_#000]">
+                                        <img id="user-avatar" src="" alt="" class="w-8 h-8 rounded-full border-2 border-black">
+                                        <span id="user-name" class="font-bold text-sm"></span>
+                    </div>
+                                    <button id="btn-logout" class="cartoon-btn bg-slate-500 text-white px-4 py-2 rounded-lg font-bold hover:brightness-110">
+                                        <span data-i18n="logout">退出登录</span>
+                                    </button>
+                                </div>
+                                
+                                <!-- Mobile: Avatar only -->
+                                <div class="user-info-mobile items-center gap-2">
+                                    <img id="user-avatar-mobile" src="" alt="" class="w-10 h-10 rounded-full border-2 border-black">
+                                    <button id="btn-logout-mobile" class="cartoon-btn bg-slate-500 text-white px-3 py-1.5 rounded-lg font-bold text-sm hover:brightness-110">
+                                        <span data-i18n="logoutMobile">退出</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Library Content -->
+                <div class="p-4 md:p-8 bg-white">
+                    <div id="library-list" class="space-y-3 md:space-y-4">
+                        <!-- Font items will be inserted here -->
+                </div>
+                    <div id="library-empty" class="hidden text-center py-8 md:py-12">
+                        <div class="w-20 h-20 mx-auto mb-4 bg-slate-100 rounded-full border-2 border-black flex items-center justify-center">
+                            <i data-lucide="library" width="32" class="text-slate-400"></i>
+                        </div>
+                        <p class="text-slate-500 font-bold text-lg">字体库为空</p>
+                        <p class="text-slate-400 text-sm mt-2">在预览页面保存您的字体到这里</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Custom Confirm Dialog -->
+    <div id="confirm-overlay" class="confirm-overlay hidden">
+        <div class="confirm-dialog cartoon-card p-6 max-w-md mx-4 bg-white">
+            <h3 id="confirm-title" class="text-xl font-black text-black mb-3">确认操作</h3>
+            <p id="confirm-message" class="text-slate-600 font-bold mb-6">确定要执行此操作吗？</p>
+            <div class="flex gap-3">
+                <button id="confirm-cancel" class="flex-1 cartoon-btn bg-slate-200 text-black px-6 py-3 rounded-lg font-bold hover:bg-slate-300">
+                    <span data-i18n="cancel">取消</span>
+                </button>
+                <button id="confirm-ok" class="flex-1 cartoon-btn bg-[#FF6B6B] text-white px-6 py-3 rounded-lg font-bold hover:brightness-110">
+                    <span data-i18n="confirm">确定</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JS Logic -->
+    <script>
+        /** Data & Constants **/
+        const STORAGE_KEY = 'fontcraft_library_v1';
+        
+        // Translations
+        const translations = {
+            zh: {
+                // Character sets
+                'charSets': {
+            '小写字母': 'abcdefghijklmnopqrstuvwxyz'.split(''),
+            '大写字母': 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),
+            '数字': '0123456789'.split(''),
+            '标点符号': ['.', ',', '!', '?', ':', ';', "'", '"', '(', ')', '[', ']', '{', '}', '-', '_', '+', '=', '@', '#', '$', '%', '^', '&', '*', '<', '>', '/', '\\', '|', '~', '`']
+                },
+                // Navigation
+                'fontLibrary': '字体库',
+                'draw': '绘制',
+                'previewExport': '预览&导出',
+                // Font library page
+                'fontLibraryTitle': '字体库',
+                'fontLibraryDesc': '管理您保存的字体',
+                'loginRequired': '请登录以查看您的字体库',
+                'noFonts': '还没有保存任何字体',
+                'noFontsDesc': '在绘制页面创建您的第一个字体吧！',
+                'characters': '个字符',
+                'synced': '已同步',
+                'edit': '编辑',
+                'download': '下载',
+                'delete': '删除',
+                'logout': '退出登录',
+                'logoutMobile': '退出',
+                'googleLogin': 'Google 登录',
+                // Draw page
+                'selectCharacter': '选择字符',
+                'selectCharacterDesc': '选择字符开始绘制',
+                'currentChar': '当前字符',
+                'toggleGuide': '显示/隐藏参考',
+                'brushSize': '笔刷大小',
+                'brush': '笔刷',
+                'clear': '清除',
+                'undo': '撤销',
+                'resetAll': '重置全部',
+                'reset': '重置',
+                'resetCategory': '重置',
+                'done': '完成',
+                'characterLibrary': '字符库',
+                // Preview page
+                'previewTitle': '预览 & 导出',
+                'exportFont': '导出字体',
+                'percentComplete': '% 完成',
+                'fontNameLabel': '字体名称',
+                'fontNamePlaceholder': '输入字体名称',
+                'downloadFont': '下载字体',
+                'saveToLibrary': '保存到字体库',
+                'editableTextLabel': '编辑预览文字',
+                'restoreContent': '还原文字内容',
+                'previewLabel': '预览',
+                // Dialogs
+                'confirmTitle': '确认',
+                'cancel': '取消',
+                'confirm': '确定',
+                'resetAllConfirm': '确定要重置所有字符吗？这将清除所有已绘制的字符。',
+                'resetCategoryConfirm': '确定要重置这个分类的所有字符吗？',
+                'deleteConfirm': '确定要删除字体 "{name}" 吗？',
+                'restoreContentConfirm': '确定要还原预览文字到初始状态吗？',
+                'saveFontSuccess': '字体"{name}"已成功保存到字体库！',
+                'saveFontSuccessTitle': '保存成功',
+                'duplicateFontName': '已存在同名字体"{name}"。是否仍要保存？',
+                'duplicateFontTitle': '字体重名',
+                'syncLocalFonts': '检测到您本地保存了 {count} 个字体。是否要将这些字体添加到您的账号中？',
+                'syncLocalFontsTitle': '同步本地字体',
+                'firestoreUnavailable': 'Firestore 数据库权限未配置，字体将仅保存在本地浏览器中。\n\n请联系管理员配置 Firestore 安全规则。',
+                'firestoreUnavailableTitle': '云端同步不可用',
+                // Default preview text
+                'defaultPreviewText': 'In 1984, Jack wrote a quick note about a quiet fox and a lazy dog. Lily asked, "Does this font feel clear and friendly?" Jack smiled: "Maybe, but check every letter."\nThey typed a short line: Pack my box with five dozen liquor jugs, and fixed a quirky zebra story.\nFor contact, Jack left an email: fafa27756@mail.com, and added, "Reply before 8:30, ok?"\nThey tried simple marks like . , ! ? : ; ( ) [ ] { } - _ + = @ # & /\nIf words look even and clean, the font works well.'
+            },
+            en: {
+                'charSets': {
+                    'Lowercase': 'abcdefghijklmnopqrstuvwxyz'.split(''),
+                    'Uppercase': 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),
+                    'Numbers': '0123456789'.split(''),
+                    'Punctuation': ['.', ',', '!', '?', ':', ';', "'", '"', '(', ')', '[', ']', '{', '}', '-', '_', '+', '=', '@', '#', '$', '%', '^', '&', '*', '<', '>', '/', '\\', '|', '~', '`']
+                },
+                'fontLibrary': 'Font Library',
+                'draw': 'Draw',
+                'previewExport': 'Preview & Export',
+                'fontLibraryTitle': 'Font Library',
+                'fontLibraryDesc': 'Manage your saved fonts',
+                'loginRequired': 'Please log in to view your font library',
+                'noFonts': 'No fonts saved yet',
+                'noFontsDesc': 'Create your first font on the draw page!',
+                'characters': ' characters',
+                'synced': 'Synced',
+                'edit': 'Edit',
+                'download': 'Download',
+                'delete': 'Delete',
+                'logout': 'Logout',
+                'logoutMobile': 'Logout',
+                'googleLogin': 'Google Sign In',
+                'selectCharacter': 'Select Character',
+                'selectCharacterDesc': 'Select a character to start drawing',
+                'currentChar': 'Current Character',
+                'toggleGuide': 'Toggle Guide',
+                'brushSize': 'Brush Size',
+                'brush': 'Brush',
+                'clear': 'Clear',
+                'undo': 'Undo',
+                'resetAll': 'Reset All',
+                'reset': 'Reset',
+                'resetCategory': 'Reset',
+                'done': 'Done',
+                'characterLibrary': 'Character Library',
+                'previewTitle': 'Preview & Export',
+                'exportFont': 'Export Font',
+                'percentComplete': '% Done',
+                'fontNameLabel': 'Font Name',
+                'fontNamePlaceholder': 'Enter font name',
+                'downloadFont': 'Download Font',
+                'saveToLibrary': 'Save to Library',
+                'editableTextLabel': 'Edit Preview Text',
+                'restoreContent': 'Restore Content',
+                'previewLabel': 'Preview',
+                'confirmTitle': 'Confirm',
+                'cancel': 'Cancel',
+                'confirm': 'OK',
+                'resetAllConfirm': 'Are you sure you want to reset all characters? This will clear all drawn characters.',
+                'resetCategoryConfirm': 'Are you sure you want to reset all characters in this category?',
+                'deleteConfirm': 'Are you sure you want to delete font "{name}"?',
+                'restoreContentConfirm': 'Are you sure you want to restore the preview text to its initial state?',
+                'saveFontSuccess': 'Font "{name}" has been successfully saved to the library!',
+                'saveFontSuccessTitle': 'Save Successful',
+                'duplicateFontName': 'A font named "{name}" already exists. Do you still want to save?',
+                'duplicateFontTitle': 'Duplicate Font Name',
+                'syncLocalFonts': 'Detected {count} locally saved fonts. Would you like to add them to your account?',
+                'syncLocalFontsTitle': 'Sync Local Fonts',
+                'firestoreUnavailable': 'Firestore database permissions are not configured. Fonts will only be saved locally in your browser.\n\nPlease contact the administrator to configure Firestore security rules.',
+                'firestoreUnavailableTitle': 'Cloud Sync Unavailable',
+                'defaultPreviewText': 'In 1984, Jack wrote a quick note about a quiet fox and a lazy dog. Lily asked, "Does this font feel clear and friendly?" Jack smiled: "Maybe, but check every letter."\nThey typed a short line: Pack my box with five dozen liquor jugs, and fixed a quirky zebra story.\nFor contact, Jack left an email: fafa27756@mail.com, and added, "Reply before 8:30, ok?"\nThey tried simple marks like . , ! ? : ; ( ) [ ] { } - _ + = @ # & /\nIf words look even and clean, the font works well.'
+            },
+            ja: {
+                'charSets': {
+                    '小文字': 'abcdefghijklmnopqrstuvwxyz'.split(''),
+                    '大文字': 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(''),
+                    '数字': '0123456789'.split(''),
+                    '記号': ['.', ',', '!', '?', ':', ';', "'", '"', '(', ')', '[', ']', '{', '}', '-', '_', '+', '=', '@', '#', '$', '%', '^', '&', '*', '<', '>', '/', '\\', '|', '~', '`']
+                },
+                'fontLibrary': 'フォント一覧',
+                'draw': '描画',
+                'previewExport': 'プレビュー＆出力',
+                'fontLibraryTitle': 'フォント一覧',
+                'fontLibraryDesc': '保存したフォントを管理',
+                'loginRequired': 'フォントライブラリを表示するにはログインしてください',
+                'noFonts': 'まだフォントが保存されていません',
+                'noFontsDesc': '描画ページで最初のフォントを作成しましょう！',
+                'characters': '文字',
+                'synced': '同期済み',
+                'edit': '編集',
+                'download': 'ダウンロード',
+                'delete': '削除',
+                'logout': 'ログアウト',
+                'logoutMobile': 'ログアウト',
+                'googleLogin': 'Google ログイン',
+                'selectCharacter': '選択文字',
+                'selectCharacterDesc': '文字を選択して描画を開始',
+                'currentChar': '現在の文字',
+                'toggleGuide': 'ガイド表示切替',
+                'brushSize': 'ブラシサイズ',
+                'brush': 'ブラシ',
+                'clear': '削除',
+                'undo': '戻す',
+                'resetAll': 'すべてリセット',
+                'reset': 'リセット',
+                'resetCategory': 'リセット',
+                'done': '完了',
+                'characterLibrary': '文字ライブラリ',
+                'previewTitle': 'プレビュー＆出力',
+                'exportFont': 'フォントを出力',
+                'percentComplete': '% 完了',
+                'fontNameLabel': 'フォント名',
+                'fontNamePlaceholder': 'フォント名を入力',
+                'downloadFont': 'フォントをダウンロード',
+                'saveToLibrary': 'ライブラリに保存',
+                'editableTextLabel': 'プレビューテキストを編集',
+                'restoreContent': 'コンテンツを復元',
+                'previewLabel': 'プレビュー',
+                'confirmTitle': '確認',
+                'cancel': 'キャンセル',
+                'confirm': 'OK',
+                'resetAllConfirm': 'すべての文字をリセットしてもよろしいですか？描画したすべての文字が消去されます。',
+                'resetCategoryConfirm': 'このカテゴリのすべての文字をリセットしてもよろしいですか？',
+                'deleteConfirm': 'フォント「{name}」を削除してもよろしいですか？',
+                'restoreContentConfirm': 'プレビューテキストを初期状態に復元してもよろしいですか？',
+                'saveFontSuccess': 'フォント「{name}」がライブラリに正常に保存されました！',
+                'saveFontSuccessTitle': '保存成功',
+                'duplicateFontName': '「{name}」という名前のフォントがすでに存在します。それでも保存しますか？',
+                'duplicateFontTitle': 'フォント名の重複',
+                'syncLocalFonts': 'ローカルに{count}個のフォントが保存されています。これらをアカウントに追加しますか？',
+                'syncLocalFontsTitle': 'ローカルフォントを同期',
+                'firestoreUnavailable': 'Firestoreデータベースの権限が設定されていません。フォントはブラウザのローカルにのみ保存されます。\n\n管理者にFirestoreセキュリティルールの設定を依頼してください。',
+                'firestoreUnavailableTitle': 'クラウド同期は利用できません',
+                'defaultPreviewText': 'In 1984, Jack wrote a quick note about a quiet fox and a lazy dog. Lily asked, "Does this font feel clear and friendly?" Jack smiled: "Maybe, but check every letter."\nThey typed a short line: Pack my box with five dozen liquor jugs, and fixed a quirky zebra story.\nFor contact, Jack left an email: fafa27756@mail.com, and added, "Reply before 8:30, ok?"\nThey tried simple marks like . , ! ? : ; ( ) [ ] { } - _ + = @ # & /\nIf words look even and clean, the font works well.'
+            }
+        };
+        
+        const CHAR_SETS = translations.zh.charSets;
+
+        const ALL_CHARS = Object.values(CHAR_SETS).flat();
+        
+        // Default preview text
+        const DEFAULT_PREVIEW_TEXT = "In 1984, Jack wrote a quick note about a quiet fox and a lazy dog. Lily asked, \"Does this font feel clear and friendly?\" Jack smiled: \"Maybe, but check every letter.\"\nThey typed a short line: Pack my box with five dozen liquor jugs, and fixed a quirky zebra story.\nFor contact, Jack left an email: fafa27756@mail.com, and added, \"Reply before 8:30, ok?\"\nThey tried simple marks like . , ! ? : ; ( ) [ ] { } - _ + = @ # & /\nIf words look even and clean, the font works well.";
+
+        // Application State
+        const state = {
+            view: 'draw', // 'draw' | 'preview' | 'library'
+            selectedChar: 'a',
+            brushSize: 25,
+            showGuide: true,
+            library: JSON.parse(localStorage.getItem(STORAGE_KEY)) || { name: 'MyFunFont', chars: {} },
+            savedFonts: JSON.parse(localStorage.getItem('fontcraft_saved_fonts')) || [],
+            // Runtime drawing state
+            isDrawing: false,
+            currentPoints: [],
+            currentStrokes: [], // Array of { d: string, width: number }
+            undoStack: [], // For undo functionality
+            previewText: DEFAULT_PREVIEW_TEXT,
+            previewSize: window.innerWidth < 768 ? 18 : 18,
+            // Language
+            currentLang: localStorage.getItem('fontcraft_lang') || 'en'
+        };
+        
+        // Translation function
+        function t(key) {
+            return translations[state.currentLang][key] || key;
+        }
+        
+        // Function to update all UI text
+        function updateUILanguage() {
+            // Update all elements with data-i18n attribute
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (translations[state.currentLang][key]) {
+                    el.textContent = translations[state.currentLang][key];
+                }
+            });
+            
+            // Update placeholders
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                if (translations[state.currentLang][key]) {
+                    el.placeholder = translations[state.currentLang][key];
+                }
+            });
+            
+            // Update character picker
+            renderCharacterPicker();
+            
+            // Update current view
+            if (state.view === 'library') {
+                renderFontLibrary();
+            } else if (state.view === 'preview') {
+                updatePreviewPageText();
+            }
+            
+            // Refresh icons
+            lucide.createIcons();
+            
+            // Save language preference
+            localStorage.setItem('fontcraft_lang', state.currentLang);
+            
+            // Update active language indicator in dropdowns
+            updateLangActiveIndicator();
+        }
+        
+        function updateLangActiveIndicator() {
+            document.querySelectorAll('[data-lang]').forEach(btn => {
+                const dot = btn.querySelector('.lang-active-dot');
+                if (btn.dataset.lang === state.currentLang) {
+                    if (!dot) {
+                        const dotEl = document.createElement('span');
+                        dotEl.className = 'lang-active-dot w-2 h-2 rounded-full bg-[#10B981] flex-shrink-0';
+                        btn.appendChild(dotEl);
+                    }
+                } else {
+                    if (dot) dot.remove();
+                }
+            });
+        }
+        
+        function updatePreviewPageText() {
+            // This will be called when in preview view
+            // Will update dynamically generated content
+        }
+
+        const VIEW_WIDTH = 500;
+        const VIEW_HEIGHT = 500;
+
+        /** DOM Elements **/
+        const els = {
+            // Confirm Dialog
+            confirmOverlay: document.getElementById('confirm-overlay'),
+            confirmTitle: document.getElementById('confirm-title'),
+            confirmMessage: document.getElementById('confirm-message'),
+            confirmOk: document.getElementById('confirm-ok'),
+            confirmCancel: document.getElementById('confirm-cancel'),
+            
+            // Language
+            btnLang: document.getElementById('btn-lang'),
+            dropdownLang: document.getElementById('dropdown-lang'),
+            labelLang: document.getElementById('label-lang'),
+            // Mobile language controls
+            btnLangMobile: document.getElementById('btn-lang-mobile'),
+            dropdownLangMobile: document.getElementById('dropdown-lang-mobile'),
+            labelLangMobile: document.getElementById('label-lang-mobile'),
+            // Both desktop & mobile language options share data-lang
+            langOptions: document.querySelectorAll('[data-lang]'),
+
+            // Navigation
+            navDraw: document.getElementById('nav-draw'),
+            navPreview: document.getElementById('nav-preview'),
+            navLibrary: document.getElementById('nav-library'),
+            navLibraryMobile: document.getElementById('nav-library-mobile'),
+            navDrawMobile: document.getElementById('nav-draw-mobile'),
+            navPreviewMobile: document.getElementById('nav-preview-mobile'),
+            viewDraw: document.getElementById('view-draw'),
+            viewPreview: document.getElementById('view-preview'),
+            viewLibrary: document.getElementById('view-library'),
+            
+            // Picker
+            pickerContainer: document.getElementById('picker-container'),
+            doneCount: document.getElementById('done-count'),
+            btnResetLib: document.getElementById('btn-reset-library'),
+            // Mobile character picker
+            btnMobileCharSelect: document.getElementById('btn-mobile-char-select'),
+            mobileCurrentChar: document.getElementById('mobile-current-char'),
+            mobileCharSheet: document.getElementById('mobile-char-sheet'),
+            mobileSheetBackdrop: document.getElementById('mobile-sheet-backdrop'),
+            mobileSheetContent: document.getElementById('mobile-sheet-content'),
+            btnCloseMobileSheet: document.getElementById('btn-close-mobile-sheet'),
+            btnResetAllMobile: document.getElementById('btn-reset-all-mobile'),
+            mobilePickerContainer: document.getElementById('mobile-picker-container'),
+            
+            // Canvas
+            currentCharDisplay: document.getElementById('current-char-display'),
+            btnToggleGuide: document.getElementById('btn-toggle-guide'),
+            btnToggleGuideMobile: document.getElementById('btn-toggle-guide-mobile'),
+            canvasWrapper: document.getElementById('canvas-wrapper'),
+            svg: document.getElementById('drawing-svg'),
+            svgGuideText: document.getElementById('svg-guide-text'),
+            svgBgImage: document.getElementById('svg-bg-image'),
+            svgStrokes: document.getElementById('svg-strokes'),
+            svgCurrentPath: document.getElementById('svg-current-path'),
+            
+            // Tools
+            inputBrushSlider: document.getElementById('input-brush-slider'),
+            inputBrushNumber: document.getElementById('input-brush-number'),
+            brushPreviewDot: document.getElementById('brush-preview-dot'),
+            
+            btnUndo: document.getElementById('btn-undo'),
+            btnClear: document.getElementById('btn-clear'),
+            
+            // Export & Preview
+            inputFontName: document.getElementById('input-font-name'),
+            inputFontNameDesktop: document.getElementById('input-font-name-desktop'),
+            btnSaveToLibrary: document.getElementById('btn-save-to-library'),
+            btnDownload: document.getElementById('btn-download'),
+            btnDownloadDesktop: document.getElementById('btn-download-desktop'),
+            progressBar: document.getElementById('progress-bar'),
+            progressText: document.getElementById('progress-text'),
+            
+            inputPreviewText: document.getElementById('input-preview-text'),
+            previewOutput: document.getElementById('preview-output'),
+            btnResetPreviewText: document.getElementById('btn-reset-preview-text'),
+            
+            // Font Library
+            libraryList: document.getElementById('library-list'),
+            libraryEmpty: document.getElementById('library-empty'),
+        };
+
+        /** Custom Confirm Dialog **/
+        function showConfirm(message, title = '确认操作', onlyOk = false) {
+            return new Promise((resolve) => {
+                els.confirmTitle.textContent = title;
+                els.confirmMessage.textContent = message;
+                els.confirmOverlay.classList.remove('hidden');
+                
+                // Hide cancel button if onlyOk is true
+                if (onlyOk) {
+                    els.confirmCancel.classList.add('hidden');
+                } else {
+                    els.confirmCancel.classList.remove('hidden');
+                }
+                
+                const handleOk = () => {
+                    els.confirmOverlay.classList.add('hidden');
+                    cleanup();
+                    resolve(true);
+                };
+                
+                const handleCancel = () => {
+                    els.confirmOverlay.classList.add('hidden');
+                    cleanup();
+                    resolve(false);
+                };
+                
+                const cleanup = () => {
+                    els.confirmOk.removeEventListener('click', handleOk);
+                    els.confirmCancel.removeEventListener('click', handleCancel);
+                };
+                
+                els.confirmOk.addEventListener('click', handleOk);
+                els.confirmCancel.addEventListener('click', handleCancel);
+            });
+        }
+
+        /** Initialization **/
+        function init() {
+            // Load language preference
+            const savedLang = localStorage.getItem('fontcraft_lang');
+            if (savedLang && translations[savedLang]) {
+                state.currentLang = savedLang;
+            }
+            const labels = { 'zh': '中文', 'en': 'English', 'ja': '日本語' };
+            els.labelLang.textContent = labels[state.currentLang] || 'English';
+            if (els.labelLangMobile) {
+                els.labelLangMobile.textContent = labels[state.currentLang] || 'English';
+            }
+            
+            // Initialize UI
+            lucide.createIcons();
+            setupEventListeners();
+            updateUILanguage(); // Apply translations + active lang indicator
+            renderCharacterPicker();
+            updateCanvasView();
+            updateBrushPreview();
+            updateNav();
+        }
+
+        function setupEventListeners() {
+            // Language Switcher
+            // Desktop language dropdown
+            els.btnLang.addEventListener('click', (e) => {
+                e.stopPropagation();
+                els.dropdownLang.classList.toggle('hidden');
+                els.dropdownLang.classList.toggle('flex');
+            });
+            // Mobile language dropdown
+            if (els.btnLangMobile) {
+                els.btnLangMobile.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    els.dropdownLangMobile.classList.toggle('hidden');
+                    els.dropdownLangMobile.classList.toggle('flex');
+                });
+            }
+            // Close dropdowns when clicking outside
+            document.addEventListener('click', () => {
+                els.dropdownLang.classList.add('hidden');
+                els.dropdownLang.classList.remove('flex');
+                if (els.dropdownLangMobile) {
+                    els.dropdownLangMobile.classList.add('hidden');
+                    els.dropdownLangMobile.classList.remove('flex');
+                }
+            });
+            els.langOptions.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const lang = btn.dataset.lang;
+                    const labels = { 'zh': '中文', 'en': 'English', 'ja': '日本語' };
+                    els.labelLang.textContent = labels[lang] || 'English';
+                    if (els.labelLangMobile) {
+                        els.labelLangMobile.textContent = labels[lang] || 'English';
+                    }
+                    // Update language state and UI
+                    state.currentLang = lang;
+                    updateUILanguage();
+                });
+            });
+
+            // Navigation
+            els.navDraw.addEventListener('click', () => switchView('draw'));
+            els.navPreview.addEventListener('click', () => switchView('preview'));
+            els.navLibrary.addEventListener('click', () => switchView('library'));
+            if (els.navLibraryMobile) {
+                els.navLibraryMobile.addEventListener('click', () => switchView('library'));
+            }
+            if (els.navDrawMobile) {
+                els.navDrawMobile.addEventListener('click', () => switchView('draw'));
+            }
+            if (els.navPreviewMobile) {
+                els.navPreviewMobile.addEventListener('click', () => switchView('preview'));
+            }
+
+            // Mobile character selection
+            if (els.btnMobileCharSelect && els.mobileCharSheet) {
+                const openMobileSheet = () => {
+                    els.mobileCharSheet.classList.remove('pointer-events-none');
+                    els.mobileSheetBackdrop.classList.remove('opacity-0');
+                    els.mobileSheetContent.classList.remove('translate-y-full');
+                };
+                const closeMobileSheet = () => {
+                    els.mobileCharSheet.classList.add('pointer-events-none');
+                    els.mobileSheetBackdrop.classList.add('opacity-0');
+                    els.mobileSheetContent.classList.add('translate-y-full');
+                };
+                
+                els.btnMobileCharSelect.addEventListener('click', openMobileSheet);
+                els.btnCloseMobileSheet.addEventListener('click', closeMobileSheet);
+                els.mobileSheetBackdrop.addEventListener('click', closeMobileSheet);
+                
+                // Mobile reset all button
+                if (els.btnResetAllMobile) {
+                    els.btnResetAllMobile.addEventListener('click', async () => {
+                        const confirmed = await showConfirm('确定要重置吗？这将清空您绘制的所有字母，此操作无法撤销！', '重置字库');
+                        if(confirmed) {
+                            state.library.chars = {};
+                            saveLibrary();
+                            resetCanvas();
+                            renderCharacterPicker();
+                            updateNav();
+                        }
+                    });
+                }
+            }
+
+            // Library
+            els.btnResetLib.addEventListener('click', async () => {
+                const confirmed = await showConfirm('确定要重置吗？这将清空您绘制的所有字母，此操作无法撤销！', '重置字库');
+                if(confirmed) {
+                    state.library.chars = {};
+                    saveLibrary();
+                    resetCanvas();
+                    renderCharacterPicker();
+                    updateNav(); // Updates count
+                }
+            });
+
+            // Drawing Controls
+            els.inputBrushSlider.addEventListener('input', (e) => setBrushSize(e.target.value));
+            els.inputBrushNumber.addEventListener('input', (e) => setBrushSize(e.target.value));
+            
+            // Toggle guide function for both desktop and mobile
+            const toggleGuide = () => {
+                state.showGuide = !state.showGuide;
+                els.svgGuideText.style.display = state.showGuide ? 'block' : 'none';
+                
+                // Update desktop button
+                els.btnToggleGuide.classList.toggle('bg-[#4ADE80]', state.showGuide);
+                els.btnToggleGuide.classList.toggle('bg-white', !state.showGuide);
+                
+                // Update mobile button
+                if (els.btnToggleGuideMobile) {
+                    els.btnToggleGuideMobile.classList.toggle('bg-[#4ADE80]', state.showGuide);
+                    els.btnToggleGuideMobile.classList.toggle('bg-white', !state.showGuide);
+                }
+            };
+            
+            els.btnToggleGuide.addEventListener('click', toggleGuide);
+            if (els.btnToggleGuideMobile) {
+                els.btnToggleGuideMobile.addEventListener('click', toggleGuide);
+            }
+
+            els.btnUndo.addEventListener('click', undoStroke);
+            els.btnClear.addEventListener('click', clearCanvas);
+
+            // Canvas Interaction
+            els.svg.addEventListener('mousedown', startDrawing);
+            els.svg.addEventListener('mousemove', draw);
+            els.svg.addEventListener('mouseup', stopDrawing);
+            els.svg.addEventListener('mouseleave', stopDrawing);
+            
+            els.svg.addEventListener('touchstart', startDrawing, {passive: false});
+            els.svg.addEventListener('touchmove', draw, {passive: false});
+            els.svg.addEventListener('touchend', stopDrawing);
+
+            // Preview & Export
+            // Sync font name between mobile and desktop inputs
+            els.inputFontName.addEventListener('input', (e) => {
+                state.library.name = e.target.value;
+                if (els.inputFontNameDesktop) {
+                    els.inputFontNameDesktop.value = e.target.value;
+                }
+            });
+            if (els.inputFontNameDesktop) {
+                els.inputFontNameDesktop.addEventListener('input', (e) => {
+                    state.library.name = e.target.value;
+                    els.inputFontName.value = e.target.value;
+            });
+            }
+            
+            // Download buttons (both mobile and desktop)
+            els.btnDownload.addEventListener('click', downloadFont);
+            if (els.btnDownloadDesktop) {
+                els.btnDownloadDesktop.addEventListener('click', downloadFont);
+            }
+            
+            els.inputPreviewText.addEventListener('input', (e) => {
+                state.previewText = e.target.value;
+                renderPreview();
+            });
+            
+            els.btnResetPreviewText.addEventListener('click', async () => {
+                const confirmed = await showConfirm('确定要还原预览文字为初始内容吗？', '还原文字');
+                if (confirmed) {
+                    state.previewText = DEFAULT_PREVIEW_TEXT;
+                    els.inputPreviewText.value = DEFAULT_PREVIEW_TEXT;
+                    renderPreview();
+                }
+            });
+            
+            // Font Library
+            els.btnSaveToLibrary.addEventListener('click', saveToFontLibrary);
+        }
+
+        /** Core Logic **/
+
+        function switchView(viewName) {
+            state.view = viewName;
+            updateNav();
+            
+            // Hide all views
+                els.viewDraw.classList.add('hidden');
+            els.viewPreview.classList.add('hidden');
+            els.viewLibrary.classList.add('hidden');
+            
+            if (viewName === 'preview') {
+                els.viewPreview.classList.remove('hidden');
+                renderPreview();
+                updateProgress();
+            } else if (viewName === 'library') {
+                els.viewLibrary.classList.remove('hidden');
+                renderFontLibrary();
+            } else {
+                els.viewDraw.classList.remove('hidden');
+                // Ensure canvas state is correct when returning
+                updateCanvasView();
+            }
+        }
+
+        function updateNav() {
+            // Desktop nav button state: only toggle colors, keep responsive classes
+            if (els.navDraw && els.navPreview) {
+                els.navDraw.classList.remove('bg-white', 'text-black', 'bg-yellow-300', 'text-black/80', 'hover:bg-white');
+                els.navPreview.classList.remove('bg-white', 'text-black', 'bg-yellow-300', 'text-black/80', 'hover:bg-white');
+
+            if (state.view === 'draw') {
+                    els.navDraw.classList.add('bg-white', 'text-black');
+                    els.navPreview.classList.add('bg-yellow-300', 'text-black/80', 'hover:bg-white');
+                } else if (state.view === 'preview') {
+                    els.navPreview.classList.add('bg-white', 'text-black');
+                    els.navDraw.classList.add('bg-yellow-300', 'text-black/80', 'hover:bg-white');
+            } else {
+                    // Other views: both inactive
+                    els.navDraw.classList.add('bg-yellow-300', 'text-black/80', 'hover:bg-white');
+                    els.navPreview.classList.add('bg-yellow-300', 'text-black/80', 'hover:bg-white');
+                }
+            }
+
+            // Mobile nav button state
+            if (els.navDrawMobile && els.navPreviewMobile && els.navLibraryMobile) {
+                const activeMobile = ['bg-white', 'text-black'];
+                const inactiveMobile = ['bg-yellow-300', 'text-black/80', 'hover:bg-white'];
+
+                // Reset classes
+                [els.navDrawMobile, els.navPreviewMobile].forEach(btn => {
+                    btn.classList.remove('bg-white', 'text-black', 'bg-yellow-300', 'text-black/80', 'hover:bg-white');
+                });
+
+                if (state.view === 'draw') {
+                    els.navDrawMobile.classList.add(...activeMobile);
+                    els.navPreviewMobile.classList.add(...inactiveMobile);
+                } else if (state.view === 'preview') {
+                    els.navPreviewMobile.classList.add(...activeMobile);
+                    els.navDrawMobile.classList.add(...inactiveMobile);
+                } else {
+                    // Other views: both inactive
+                    els.navDrawMobile.classList.add(...inactiveMobile);
+                    els.navPreviewMobile.classList.add(...inactiveMobile);
+                }
+            }
+
+            // Update done count
+            const count = Object.keys(state.library.chars).length;
+            els.doneCount.textContent = count;
+            // Update mobile current char label if present
+            if (els.mobileCurrentChar) {
+                els.mobileCurrentChar.textContent = state.selectedChar;
+            }
+        }
+
+        function setBrushSize(val) {
+            const size = Math.max(5, Math.min(80, Number(val)));
+            state.brushSize = size;
+            els.inputBrushSlider.value = size;
+            els.inputBrushNumber.value = size;
+            updateBrushPreview();
+        }
+
+        function updateBrushPreview() {
+            const SCREEN_SCALE = 270 / 500; // Fixed scale for square canvas
+            const sizePx = state.brushSize * SCREEN_SCALE;
+            els.brushPreviewDot.style.width = `${sizePx}px`;
+            els.brushPreviewDot.style.height = `${sizePx}px`;
+        }
+
+        function saveLibrary() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
+            updateNav();
+        }
+
+        /** Character Picker Logic **/
+
+        function renderCharacterPicker() {
+            els.pickerContainer.innerHTML = '';
+            if (els.mobilePickerContainer) {
+                els.mobilePickerContainer.innerHTML = '';
+            }
+
+            const currentCharSets = translations[state.currentLang].charSets;
+            for (const [title, chars] of Object.entries(currentCharSets)) {
+                // Section
+                const section = document.createElement('div');
+                section.className = 'mb-8 last:mb-0';
+                
+                // Title with reset button
+                const titleWrapper = document.createElement('div');
+                titleWrapper.className = 'mb-4';
+                
+                const h3 = document.createElement('h3');
+                h3.className = 'text-sm font-black text-black uppercase tracking-widest flex items-center justify-between gap-2 bg-[#FCD34D] px-3 py-1 border-2 border-black shadow-[2px_2px_0px_0px_#000] rounded-md cursor-pointer hover:bg-[#FBD24E] transition-colors';
+                
+                const titleText = document.createElement('span');
+                titleText.textContent = title;
+                h3.appendChild(titleText);
+                
+                const resetIcon = document.createElement('i');
+                resetIcon.setAttribute('data-lucide', 'rotate-ccw');
+                resetIcon.setAttribute('width', '16');
+                resetIcon.className = 'ml-2';
+                h3.appendChild(resetIcon);
+                
+                // Reset category function
+                h3.onclick = async (e) => {
+                    e.stopPropagation();
+                    const confirmed = await showConfirm(t('resetCategoryConfirm'), t('confirmTitle'));
+                    if(confirmed) {
+                        chars.forEach(char => {
+                            delete state.library.chars[char];
+                        });
+                        saveLibrary();
+                        renderCharacterPicker();
+                        updateNav();
+                        // If current char is in this category, reset canvas
+                        if(chars.includes(state.selectedChar)) {
+                            resetCanvas();
+                            updateCanvasView();
+                        }
+                    }
+                };
+                
+                titleWrapper.appendChild(h3);
+                section.appendChild(titleWrapper);
+
+                // Grid
+                const grid = document.createElement('div');
+                grid.className = 'grid grid-cols-8 sm:grid-cols-10 md:grid-cols-12 gap-2';
+
+                chars.forEach(char => {
+                    const btn = document.createElement('button');
+                    const isSelected = state.selectedChar === char;
+                    const hasDrawing = !!state.library.chars[char];
+
+                    let btnClass = 'char-btn relative aspect-square flex items-center justify-center rounded-lg text-base font-bold transition-all border-2 ';
+                    if (isSelected) {
+                        btnClass += 'bg-black text-white shadow-[4px_4px_0px_0px_rgba(0,0,0,0.2)] -translate-y-1 z-10 border-black';
+                    } else {
+                        btnClass += 'bg-white text-slate-500 border-slate-200 hover:border-black hover:text-black hover:shadow-[3px_3px_0px_0px_#000] hover:-translate-y-0.5';
+                    }
+                    
+                    btn.className = btnClass;
+                    btn.textContent = char;
+                    btn.onclick = () => selectChar(char);
+
+                    // Dot indicator
+                    if (hasDrawing) {
+                        const dot = document.createElement('div');
+                        dot.className = `absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-[#4ADE80]'}`;
+                        btn.appendChild(dot);
+                    }
+
+                    grid.appendChild(btn);
+                });
+
+                section.appendChild(grid);
+                els.pickerContainer.appendChild(section);
+
+                // Mobile version (simplified layout)
+                if (els.mobilePickerContainer) {
+                    const mobileSection = document.createElement('div');
+                    mobileSection.className = 'mb-6 last:mb-0';
+
+                    const mobileTitle = document.createElement('h3');
+                    mobileTitle.className = 'text-xs font-black text-black uppercase tracking-widest flex items-center justify-between gap-2 bg-[#FCD34D] px-3 py-1 border-2 border-black shadow-[2px_2px_0px_0px_#000] rounded-md cursor-pointer hover:bg-[#FBD24E] transition-colors';
+                    
+                    const mobileTitleText = document.createElement('span');
+                    mobileTitleText.textContent = title;
+                    mobileTitle.appendChild(mobileTitleText);
+                    
+                    const mobileResetIcon = document.createElement('i');
+                    mobileResetIcon.setAttribute('data-lucide', 'rotate-ccw');
+                    mobileResetIcon.setAttribute('width', '14');
+                    mobileResetIcon.className = 'ml-2';
+                    mobileTitle.appendChild(mobileResetIcon);
+                    
+                    // Reset category function (same as desktop)
+                    mobileTitle.onclick = async (e) => {
+                        e.stopPropagation();
+                        const confirmed = await showConfirm(`确定要重置"${title}"中的所有字符吗？`, '重置分类');
+                        if(confirmed) {
+                            chars.forEach(char => {
+                                delete state.library.chars[char];
+                            });
+                            saveLibrary();
+                            renderCharacterPicker();
+                            updateNav();
+                            // If current char is in this category, reset canvas
+                            if(chars.includes(state.selectedChar)) {
+                                resetCanvas();
+                                updateCanvasView();
+                            }
+                        }
+                    };
+                    
+                    mobileSection.appendChild(mobileTitle);
+
+                    const mobileGrid = document.createElement('div');
+                    mobileGrid.className = 'grid grid-cols-8 gap-2 mt-3';
+
+                    chars.forEach(char => {
+                        const btn = document.createElement('button');
+                        const isSelected = state.selectedChar === char;
+                        const hasDrawing = !!state.library.chars[char];
+
+                        let btnClass = 'char-btn relative aspect-square flex items-center justify-center rounded-lg text-base font-bold transition-all border-2 ';
+                        if (isSelected) {
+                            btnClass += 'bg-black text-white border-black';
+                        } else {
+                            btnClass += 'bg-white text-slate-500 border-slate-200';
+                        }
+
+                        btn.className = btnClass;
+                        btn.textContent = char;
+                        btn.onclick = () => selectChar(char);
+
+                        if (hasDrawing) {
+                            const dot = document.createElement('div');
+                            dot.className = `absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-[#4ADE80]'}`;
+                            btn.appendChild(dot);
+                        }
+
+                        mobileGrid.appendChild(btn);
+                    });
+
+                    mobileSection.appendChild(mobileGrid);
+                    els.mobilePickerContainer.appendChild(mobileSection);
+                }
+            }
+            
+            // Re-initialize lucide icons after rendering
+            lucide.createIcons();
+        }
+
+        function selectChar(char) {
+            state.selectedChar = char;
+            renderCharacterPicker();
+            resetCanvas();
+            updateCanvasView();
+            // Update mobile label if present
+            if (els.mobileCurrentChar) {
+                els.mobileCurrentChar.textContent = char;
+            }
+        }
+
+        /** Canvas Logic **/
+
+        function resetCanvas() {
+            state.currentStrokes = [];
+            state.undoStack = [];
+            state.currentPoints = [];
+            els.svgStrokes.innerHTML = '';
+            els.svgBgImage.setAttribute('href', '');
+            els.svgBgImage.style.display = 'none';
+            updateUndoBtn();
+        }
+
+        function updateCanvasView() {
+            const char = state.selectedChar;
+            els.currentCharDisplay.textContent = char;
+            els.svgGuideText.textContent = char;
+            
+            // If data exists in library, show it
+            const existingData = state.library.chars[char];
+            if (existingData) {
+                // Use original (uncropped) version for editing display
+                const displayData = existingData.original || existingData;
+                els.svgBgImage.setAttribute('href', displayData);
+                els.svgBgImage.style.display = 'block';
+            } else {
+                els.svgBgImage.style.display = 'none';
+            }
+        }
+
+        function getCoordinates(e) {
+            const rect = els.svg.getBoundingClientRect();
+            let clientX, clientY;
+
+            if (e.touches) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+
+            // Get current viewBox dimensions
+            const viewBox = els.svg.getAttribute('viewBox').split(' ');
+            const viewBoxWidth = parseFloat(viewBox[2]);
+            const viewBoxHeight = parseFloat(viewBox[3]);
+
+            // Map screen pixels to SVG ViewBox coordinates (dynamic)
+            const scaleX = viewBoxWidth / rect.width;
+            const scaleY = viewBoxHeight / rect.height;
+
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+
+        function pointsToPath(points) {
+            if (points.length === 0) return '';
+            if (points.length === 1) return `M ${points[0].x} ${points[0].y} L ${points[0].x} ${points[0].y}`;
+
+            let d = `M ${points[0].x} ${points[0].y}`;
+            for (let i = 1; i < points.length; i++) {
+                const p1 = points[i];
+                const midX = (points[i - 1].x + p1.x) / 2;
+                const midY = (points[i - 1].y + p1.y) / 2;
+                if (i === 1) {
+                    d += ` L ${midX} ${midY}`;
+                } else {
+                    d += ` Q ${points[i - 1].x} ${points[i - 1].y} ${midX} ${midY}`;
+                }
+            }
+            const last = points[points.length - 1];
+            d += ` L ${last.x} ${last.y}`;
+            return d;
+        }
+
+        function startDrawing(e) {
+            e.preventDefault();
+            state.isDrawing = true;
+            const point = getCoordinates(e);
+            state.currentPoints = [point];
+        }
+
+        function draw(e) {
+            if (!state.isDrawing) return;
+            e.preventDefault(); // Stop scrolling on mobile
+            const point = getCoordinates(e);
+            state.currentPoints.push(point);
+            
+            // Update temporary visual path
+            const d = pointsToPath(state.currentPoints);
+            els.svgCurrentPath.setAttribute('d', d);
+            els.svgCurrentPath.setAttribute('stroke-width', state.brushSize);
+        }
+
+        function stopDrawing(e) {
+            if (!state.isDrawing) return;
+            state.isDrawing = false;
+
+            if (state.currentPoints.length > 0) {
+                const d = pointsToPath(state.currentPoints);
+                const strokeObj = { d: d, width: state.brushSize };
+                state.currentStrokes.push(strokeObj);
+                
+                // Add to DOM
+                const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                pathEl.setAttribute('d', d);
+                pathEl.setAttribute('stroke', 'black');
+                pathEl.setAttribute('stroke-width', state.brushSize);
+                pathEl.setAttribute('fill', 'none');
+                pathEl.setAttribute('stroke-linecap', 'round');
+                pathEl.setAttribute('stroke-linejoin', 'round');
+                els.svgStrokes.appendChild(pathEl);
+
+                // Clear temp path
+                els.svgCurrentPath.setAttribute('d', '');
+                
+                saveCurrentCanvas();
+                updateUndoBtn();
+            }
+            state.currentPoints = [];
+        }
+
+        function undoStroke() {
+            if (state.currentStrokes.length === 0) return;
+            state.currentStrokes.pop();
+            // Remove last child from svg group
+            if (els.svgStrokes.lastChild) {
+                els.svgStrokes.removeChild(els.svgStrokes.lastChild);
+            }
+            
+            // If all strokes are undone, delete from library and update UI
+            if (state.currentStrokes.length === 0) {
+                delete state.library.chars[state.selectedChar];
+                saveLibrary();
+                renderCharacterPicker(); // Update to remove green dot
+                els.svgBgImage.style.display = 'none'; // Hide background image
+            } else {
+            saveCurrentCanvas();
+            }
+            
+            updateUndoBtn();
+        }
+
+        function clearCanvas() {
+            state.currentStrokes = [];
+            els.svgStrokes.innerHTML = '';
+            els.svgBgImage.style.display = 'none'; // Also clear background image on explicit clear
+            
+            // Delete from library
+            delete state.library.chars[state.selectedChar];
+            saveLibrary();
+            renderCharacterPicker(); // Update dot
+            updateUndoBtn();
+        }
+
+        function updateUndoBtn() {
+            els.btnUndo.disabled = state.currentStrokes.length === 0;
+        }
+
+        function saveCurrentCanvas() {
+            // Create SVG for saving
+            const svgContent = els.svg.cloneNode(true);
+            const guide = svgContent.querySelector('#svg-guide-text');
+            const currentPath = svgContent.querySelector('#svg-current-path');
+            if(guide) guide.remove();
+            if(currentPath) currentPath.remove();
+            svgContent.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+            
+            const svgString = new XMLSerializer().serializeToString(svgContent);
+            
+            // Save original (uncropped) version for editing
+            const originalBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+            const originalReader = new FileReader();
+            originalReader.onload = () => {
+                const originalBase64 = originalReader.result;
+                
+                // Now create cropped version for export
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                canvas.width = 500;
+                canvas.height = 500;
+                
+                const img = new Image();
+                img.onload = () => {
+                    // Draw to canvas
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(0, 0, 500, 500);
+                    ctx.drawImage(img, 0, 0, 500, 500);
+                    
+                    // Detect left and right bounds only
+                    const imageData = ctx.getImageData(0, 0, 500, 500);
+                    const bounds = detectHorizontalBounds(imageData.data, 500, 500);
+                    
+                    if (!bounds) {
+                        // No content drawn
+                        return;
+                    }
+                    
+                    // Add padding (20 pixels on left and right)
+                    const padding = 20;
+                    const cropX = Math.max(0, bounds.minX - padding);
+                    const cropY = 0; // Keep full height from top
+                    const cropWidth = Math.min(500, bounds.maxX + padding) - cropX;
+                    const cropHeight = 500; // Keep full height
+                    
+                    // Create cropped SVG with proper viewBox
+                    const croppedSvg = svgContent.cloneNode(true);
+                    croppedSvg.setAttribute('viewBox', `${cropX} ${cropY} ${cropWidth} ${cropHeight}`);
+                    croppedSvg.setAttribute('width', cropWidth);
+                    croppedSvg.setAttribute('height', cropHeight);
+                    
+                    const croppedString = new XMLSerializer().serializeToString(croppedSvg);
+                    const croppedBlob = new Blob([croppedString], { type: 'image/svg+xml;charset=utf-8' });
+                    
+                    const croppedReader = new FileReader();
+                    croppedReader.onload = () => {
+                        // Save both versions
+                        state.library.chars[state.selectedChar] = {
+                            original: originalBase64,  // For editing/display
+                            cropped: croppedReader.result  // For export
+                        };
+                saveLibrary();
+                renderCharacterPicker();
+            };
+                    croppedReader.readAsDataURL(croppedBlob);
+                };
+                
+                img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
+            };
+            originalReader.readAsDataURL(originalBlob);
+        }
+        
+        function detectHorizontalBounds(pixels, width, height) {
+            let minX = width, maxX = 0;
+            let hasContent = false;
+            
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    const i = (y * width + x) * 4;
+                    const r = pixels[i];
+                    const g = pixels[i + 1];
+                    const b = pixels[i + 2];
+                    
+                    // Check if pixel is not white (has ink)
+                    if (r < 250 || g < 250 || b < 250) {
+                        hasContent = true;
+                        if (x < minX) minX = x;
+                        if (x > maxX) maxX = x;
+                    }
+                }
+            }
+            
+            return hasContent ? { minX, maxX } : null;
+        }
+
+        /** Preview Logic **/
+
+        function updateProgress() {
+            const completed = Object.keys(state.library.chars).length;
+            const total = ALL_CHARS.length;
+            const pct = Math.round((completed / total) * 100);
+            
+            els.progressBar.style.width = `${pct}%`;
+            els.progressText.innerHTML = `${pct}<span data-i18n="percentComplete">${t('percentComplete')}</span>`;
+        }
+
+        function renderPreview() {
+            els.previewOutput.innerHTML = '';
+            const text = state.previewText;
+            
+            // Split by lines
+            const lines = text.split('\n');
+            
+            lines.forEach((line, lineIndex) => {
+                // Create a line container
+                const lineContainer = document.createElement('div');
+                lineContainer.className = 'flex flex-wrap items-baseline';
+                lineContainer.style.minHeight = `${state.previewSize}px`;
+                lineContainer.style.lineHeight = `${state.previewSize}px`;
+                
+                // Trim leading spaces from the line
+                const trimmedLine = line.trimStart();
+                const chars = trimmedLine.split('');
+                
+                chars.forEach(char => {
+                if (char === ' ') {
+                    const sp = document.createElement('div');
+                    sp.style.width = `${state.previewSize * 0.5}px`;
+                    sp.style.height = `${state.previewSize}px`;
+                        sp.style.display = 'inline-block';
+                        lineContainer.appendChild(sp);
+                    return;
+                }
+
+                const charData = state.library.chars[char];
+                
+                if (charData) {
+                    const img = document.createElement('img');
+                        // Use cropped version for preview
+                        img.src = charData.cropped || charData;
+                    img.style.height = `${state.previewSize * 1.1}px`; // Make drawn characters slightly larger
+                    img.style.width = 'auto';
+                    img.style.verticalAlign = 'bottom';
+                        img.style.display = 'inline-block';
+                        img.style.transform = 'translateY(3px)'; // Move drawn characters down slightly
+                        lineContainer.appendChild(img);
+                } else {
+                    const span = document.createElement('span');
+                    span.textContent = char;
+                    span.className = 'inline-flex items-center justify-center font-sans text-slate-300 select-none';
+                    span.style.fontSize = `${state.previewSize}px`;
+                    span.style.height = `${state.previewSize}px`;
+                        span.style.display = 'inline-block';
+                        lineContainer.appendChild(span);
+                    }
+                });
+                
+                els.previewOutput.appendChild(lineContainer);
+            });
+        }
+
+        /** Font Library Management **/
+        
+        async function saveToFontLibrary() {
+            // Sync font name from both inputs
+            const fontName = (els.inputFontName.value.trim() || els.inputFontNameDesktop?.value.trim() || 'MyFunFont');
+            
+            // Sync both inputs
+            els.inputFontName.value = fontName;
+            if (els.inputFontNameDesktop) {
+                els.inputFontNameDesktop.value = fontName;
+            }
+            
+            // Check if font name already exists
+            const existingFont = state.savedFonts.find(font => font.name === fontName);
+            
+            if (existingFont) {
+                const confirmed = await showConfirm(
+                    t('duplicateFontName').replace('{name}', fontName), 
+                    t('duplicateFontTitle')
+                );
+                if (!confirmed) {
+                    return; // User cancelled, can rename
+                }
+            }
+            
+            // Create a deep copy of current library with all characters
+            const fontData = {
+                id: Date.now(),
+                name: fontName,
+                createdAt: new Date().toISOString(),
+                chars: { ...state.library.chars },
+                synced: false  // Mark as not synced initially
+            };
+            
+            // Save to cloud if logged in
+            if (window.getCurrentUser && window.getCurrentUser()) {
+                try {
+                    await window.saveFontToCloud(fontData);
+                    fontData.synced = true;  // Mark as synced after successful upload
+                } catch (error) {
+                    console.error('Failed to save to cloud:', error);
+                }
+            }
+            
+            // Add to saved fonts
+            state.savedFonts.push(fontData);
+            localStorage.setItem('fontcraft_saved_fonts', JSON.stringify(state.savedFonts));
+            
+            // Show success message
+            await showConfirm(
+                t('saveFontSuccess').replace('{name}', fontName), 
+                t('saveFontSuccessTitle'),
+                true  // Only show OK button
+            );
+        }
+        
+        function renderFontLibrary() {
+            if (state.savedFonts.length === 0) {
+                els.libraryList.classList.add('hidden');
+                els.libraryEmpty.classList.remove('hidden');
+                lucide.createIcons();
+                return;
+            }
+            
+            els.libraryEmpty.classList.add('hidden');
+            els.libraryList.classList.remove('hidden');
+            els.libraryList.innerHTML = '';
+            
+            state.savedFonts.forEach((font, index) => {
+                const item = document.createElement('div');
+                item.className = 'cartoon-card p-4 md:p-6 bg-white transition-all no-shadow';
+                
+                const charCount = Object.keys(font.chars).length;
+                const dateStr = new Date(font.createdAt).toLocaleDateString('zh-CN');
+                
+                // Generate preview - only show characters that exist, max 9
+                let previewHTML = '';
+                let count = 0;
+                const maxPreview = 9;
+                
+                for (const char of ALL_CHARS) {
+                    if (count >= maxPreview) break;
+                    const charData = font.chars[char];
+                    if (charData) {
+                        const src = charData.cropped || charData;
+                        previewHTML += `<img src="${src}" style="height: 28px; width: auto; vertical-align: bottom; margin-right: 2px;" alt="${char}">`;
+                        count++;
+                    }
+                }
+                
+                item.innerHTML = `
+                    <!-- Desktop Layout -->
+                    <div class="desktop-layout flex items-center justify-between gap-4">
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-xl font-black text-black mb-2 flex items-center gap-2 whitespace-nowrap">
+                                <span>${font.name}</span>
+                                ${font.synced ? `<span class="flex items-center gap-1 text-sm text-[#10B981] font-bold whitespace-nowrap"><span class="w-2 h-2 rounded-full bg-[#10B981]"></span>${t('synced')}</span>` : ''}
+                            </h3>
+                            <div class="flex items-center gap-4 text-sm text-slate-600 font-bold">
+                                <span><i data-lucide="type" width="14" class="inline"></i> ${charCount}${t('characters')}</span>
+                                <span><i data-lucide="calendar" width="14" class="inline"></i> ${dateStr}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <div class="flex items-center" style="min-width: 200px;">
+                                ${previewHTML}
+                            </div>
+                            <div class="flex gap-2 flex-shrink-0">
+                                <button onclick="editFont(${index})" class="cartoon-btn bg-[#60A5FA] text-white px-3 py-1.5 rounded-lg font-bold text-sm hover:brightness-110 flex items-center gap-1.5">
+                                    <i data-lucide="edit" width="16"></i> <span>${t('edit')}</span>
+                                </button>
+                                <button onclick="downloadSavedFont(${index})" class="cartoon-btn bg-black text-white px-3 py-1.5 rounded-lg font-bold text-sm hover:brightness-110 flex items-center gap-1.5">
+                                    <i data-lucide="download" width="16"></i> <span>${t('download')}</span>
+                                </button>
+                                <button onclick="deleteSavedFont(${index})" class="cartoon-btn bg-[#FF6B6B] text-white px-3 py-1.5 rounded-lg font-bold text-sm hover:brightness-110 flex items-center gap-1.5">
+                                    <i data-lucide="trash-2" width="16"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Mobile Layout -->
+                    <div class="mobile-layout">
+                        <div class="mb-3">
+                            <h3 class="text-lg font-black text-black mb-1 flex items-center gap-2">
+                                <span>${font.name}</span>
+                                ${font.synced ? `<span class="flex items-center gap-1 text-xs text-[#10B981] font-bold"><span class="w-1.5 h-1.5 rounded-full bg-[#10B981]"></span>${t('synced')}</span>` : ''}
+                            </h3>
+                            <div class="flex items-center gap-3 text-xs text-slate-500 font-bold">
+                                <span><i data-lucide="type" width="12" class="inline"></i> ${charCount}${t('characters')}</span>
+                                <span><i data-lucide="calendar" width="12" class="inline"></i> ${dateStr}</span>
+                            </div>
+                        </div>
+                        <div class="mb-3 flex items-center overflow-x-auto pb-1">
+                            ${previewHTML}
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="editFont(${index})" class="cartoon-btn bg-[#60A5FA] text-white px-3 py-2 rounded-lg font-bold text-xs hover:brightness-110 flex items-center justify-center gap-1.5 flex-1">
+                                <i data-lucide="edit" width="14"></i> <span>${t('edit')}</span>
+                            </button>
+                            <button onclick="downloadSavedFont(${index})" class="cartoon-btn bg-black text-white px-3 py-2 rounded-lg font-bold text-xs hover:brightness-110 flex items-center justify-center gap-1.5 flex-1">
+                                <i data-lucide="download" width="14"></i> <span>${t('download')}</span>
+                            </button>
+                            <button onclick="deleteSavedFont(${index})" class="cartoon-btn bg-[#FF6B6B] text-white p-2 rounded-lg font-bold text-xs hover:brightness-110 flex items-center justify-center">
+                                <i data-lucide="trash-2" width="14"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                els.libraryList.appendChild(item);
+            });
+            
+            lucide.createIcons();
+        }
+        
+        function editFont(index) {
+            const font = state.savedFonts[index];
+            if (!font) return;
+            
+            // Load font data into current library
+            state.library.name = font.name;
+            state.library.chars = { ...font.chars };
+            els.inputFontName.value = font.name;
+            saveLibrary();
+            
+            // Switch to draw view
+            renderCharacterPicker();
+            updateCanvasView();
+            switchView('draw');
+        }
+        
+        async function downloadSavedFont(index) {
+            const font = state.savedFonts[index];
+            if (!font) return;
+            
+            // Temporarily load this font and download it
+            const originalLibrary = { ...state.library };
+            state.library = { name: font.name, chars: font.chars };
+            
+            await downloadFont();
+            
+            // Restore original library
+            state.library = originalLibrary;
+        }
+        
+        async function deleteSavedFont(index) {
+            const font = state.savedFonts[index];
+            const confirmed = await showConfirm(t('deleteConfirm').replace('{name}', font.name), t('confirmTitle'));
+            if (confirmed) {
+                // Delete from cloud if logged in
+                if (window.getCurrentUser && window.getCurrentUser()) {
+                    try {
+                        await window.deleteFontFromCloud(font.id);
+                    } catch (error) {
+                        console.error('Failed to delete from cloud:', error);
+                    }
+                }
+                
+                state.savedFonts.splice(index, 1);
+                localStorage.setItem('fontcraft_saved_fonts', JSON.stringify(state.savedFonts));
+                renderFontLibrary();
+            }
+        }
+
+        /** Export Logic - Generate TTF Font **/
+        
+        async function downloadFont() {
+            const originalText = els.btnDownload.innerHTML;
+            els.btnDownload.innerHTML = '<i data-lucide="loader-2" class="animate-spin" width="16"></i> 处理中...';
+            els.btnDownload.disabled = true;
+
+            try {
+                const fontName = state.library.name || 'MyFunFont';
+                await generateAndDownloadTTF(state.library, fontName);
+
+            } catch (e) {
+                console.error(e);
+                alert('生成字体失败: ' + e.message);
+            } finally {
+                els.btnDownload.innerHTML = originalText;
+                els.btnDownload.disabled = false;
+                lucide.createIcons();
+            }
+        }
+
+        async function generateAndDownloadTTF(library, fontName) {
+            // Create font using opentype.js
+            const notdefGlyph = new opentype.Glyph({
+                name: '.notdef',
+                unicode: 0,
+                advanceWidth: 375,
+                path: new opentype.Path()
+            });
+            
+            const glyphs = [notdefGlyph];
+            
+            // Process each character
+            for (const char of ALL_CHARS) {
+                const charData = library.chars[char];
+                const unicode = char.charCodeAt(0);
+                
+                if (!charData) {
+                    // Create empty glyph for missing characters
+                    glyphs.push(new opentype.Glyph({
+                        name: char,
+                        unicode: unicode,
+                        advanceWidth: 375,
+                        path: new opentype.Path()
+                    }));
+                    continue;
+                }
+                
+                // Convert image to path
+                const path = await convertImageToPath(charData.cropped || charData);
+                
+                glyphs.push(new opentype.Glyph({
+                    name: char,
+                    unicode: unicode,
+                    advanceWidth: path.advanceWidth,
+                    path: path.opentypePath
+                }));
+            }
+            
+            // Create font
+            const font = new opentype.Font({
+                familyName: fontName,
+                styleName: 'Regular',
+                unitsPerEm: 1000,
+                ascender: 750,
+                descender: -250,
+                glyphs: glyphs
+            });
+            
+            // Download as TTF
+            const arrayBuffer = font.toArrayBuffer();
+            const blob = new Blob([arrayBuffer], { type: 'font/ttf' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${fontName}.ttf`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+                }
+
+        async function convertImageToPath(dataUrl) {
+            return new Promise((resolve, reject) => {
+                    const img = new Image();
+                    img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                    
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    
+                    // Draw white background
+                        ctx.fillStyle = 'white';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0);
+                    
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const path = new opentype.Path();
+                    const scale = 1000 / canvas.height;
+                    const blockSize = 4; // Larger blocks for smoother output
+                    
+                    // Baseline offset to align with font metrics
+                    // Adjust Y position to match reference letter baseline
+                    const baselineOffset = -180;
+                    
+                    // Trace pixels to create path
+                    for (let y = 0; y < canvas.height; y += blockSize) {
+                        for (let x = 0; x < canvas.width; x += blockSize) {
+                            const i = (y * canvas.width + x) * 4;
+                            const r = imageData.data[i];
+                            const g = imageData.data[i + 1];
+                            const b = imageData.data[i + 2];
+                                
+                            // Check if pixel is dark (has ink)
+                                if (r < 128 && g < 128 && b < 128) {
+                                    const sx = x * scale;
+                                const sy = (canvas.height - y - blockSize) * scale + baselineOffset;
+                                const size = blockSize * scale;
+                                
+                                // Draw small rectangle
+                                path.moveTo(sx, sy);
+                                path.lineTo(sx + size, sy);
+                                path.lineTo(sx + size, sy + size);
+                                path.lineTo(sx, sy + size);
+                                path.close();
+                                }
+                            }
+                        }
+                        
+                    resolve({
+                        opentypePath: path,
+                        advanceWidth: canvas.width * scale
+                    });
+                    };
+                img.onerror = () => reject(new Error('Failed to load image'));
+                    img.src = dataUrl;
+                });
+        }
+
+        function downloadString(content, filename, type) {
+            const blob = new Blob([content], { type });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Expose state and functions to window for Firebase module
+        window.state = state;
+        window.renderFontLibrary = renderFontLibrary;
+        window.showConfirm = showConfirm;
+
+        // Run
+        init();
+
+    </script>
+    
+    <!-- Firebase Authentication -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, getDocs, deleteDoc, query } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+        
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBzq1tnmpnmoM9PNeFh7o_LWQP4SR3irBI",
+            authDomain: "school-0226.firebaseapp.com",
+            projectId: "school-0226",
+            storageBucket: "school-0226.firebasestorage.app",
+            messagingSenderId: "597216581346",
+            appId: "1:597216581346:web:0df6bf72d70467f55a70bb",
+            measurementId: "G-8XDRVH32FJ"
+        };
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const provider = new GoogleAuthProvider();
+        
+        // Current user
+        let currentUser = null;
+        
+        // UI Elements
+        const btnGoogleLogin = document.getElementById('btn-google-login');
+        const btnLogout = document.getElementById('btn-logout');
+        const btnLogoutMobile = document.getElementById('btn-logout-mobile');
+        const userInfo = document.getElementById('user-info');
+        const userName = document.getElementById('user-name');
+        const userAvatar = document.getElementById('user-avatar');
+        const userAvatarMobile = document.getElementById('user-avatar-mobile');
+        
+        // Google Login
+        btnGoogleLogin?.addEventListener('click', async () => {
+            try {
+                const result = await signInWithPopup(auth, provider);
+                currentUser = result.user;
+                
+                // Check if user has local fonts
+                const localFonts = JSON.parse(localStorage.getItem('fontcraft_saved_fonts')) || [];
+                if (localFonts.length > 0) {
+                    const confirmed = await window.showConfirm(
+                        `检测到您本地保存了 ${localFonts.length} 个字体。是否要将这些字体添加到您的账号中？`,
+                        '同步本地字体'
+                    );
+                    if (confirmed) {
+                        // Upload local fonts to cloud and mark as synced
+                        for (const font of localFonts) {
+                            await saveFontToCloud(font);
+                            font.synced = true;
+                        }
+                        // Update localStorage with synced status
+                        localStorage.setItem('fontcraft_saved_fonts', JSON.stringify(localFonts));
+                    }
+                }
+                
+                // Load user fonts from cloud
+                await loadUserFonts(currentUser.uid);
+            } catch (error) {
+                console.error('Login error:', error);
+                await window.showConfirm('登录失败：' + error.message, '登录错误', true);
+            }
+        });
+        
+        // Logout handler
+        const handleLogout = async () => {
+            try {
+                await signOut(auth);
+                currentUser = null;
+                // Load local fonts and mark them as not synced
+                const localFonts = JSON.parse(localStorage.getItem('fontcraft_saved_fonts')) || [];
+                // Remove synced status when logged out
+                localFonts.forEach(font => {
+                    font.synced = false;
+                });
+                window.state.savedFonts = localFonts;
+                window.renderFontLibrary();
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+        };
+        
+        // Logout buttons
+        btnLogout?.addEventListener('click', handleLogout);
+        btnLogoutMobile?.addEventListener('click', handleLogout);
+        
+        // Auth state observer
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                currentUser = user;
+                btnGoogleLogin.style.display = 'none';
+                userInfo.classList.remove('hidden');
+                userInfo.style.display = 'block';
+                userName.textContent = user.displayName || user.email;
+                userAvatar.src = user.photoURL || '';
+                userAvatarMobile.src = user.photoURL || '';
+                
+                await loadUserFonts(user.uid);
+            } else {
+                currentUser = null;
+                btnGoogleLogin.style.display = 'flex';
+                userInfo.classList.add('hidden');
+                userInfo.style.display = 'none';
+                
+                // Load local fonts and mark them as not synced
+                const localFonts = JSON.parse(localStorage.getItem('fontcraft_saved_fonts')) || [];
+                // Remove synced status when logged out
+                localFonts.forEach(font => {
+                    font.synced = false;
+                });
+                window.state.savedFonts = localFonts;
+                window.renderFontLibrary();
+            }
+        });
+        
+        // Load user fonts from Firestore
+        async function loadUserFonts(uid) {
+            try {
+                const fontsRef = collection(db, 'users', uid, 'fonts');
+                const q = query(fontsRef);
+                const snapshot = await getDocs(q);
+                const fonts = [];
+                snapshot.forEach(docSnap => {
+                    const fontData = docSnap.data();
+                    fontData.synced = true;  // Mark cloud fonts as synced
+                    fonts.push(fontData);
+                });
+                
+                // Ensure state exists before setting
+                if (window.state) {
+                    window.state.savedFonts = fonts;
+                    if (window.renderFontLibrary) {
+                        window.renderFontLibrary();
+                    }
+                }
+            } catch (error) {
+                console.error('Load fonts error:', error);
+                // If Firestore fails, load local fonts instead
+                const localFonts = JSON.parse(localStorage.getItem('fontcraft_saved_fonts')) || [];
+                
+                // Ensure state exists before setting
+                if (window.state) {
+                    window.state.savedFonts = localFonts;
+                    if (window.renderFontLibrary) {
+                        window.renderFontLibrary();
+                    }
+                }
+                
+                // Show warning
+                if (error.code === 'permission-denied' && window.showConfirm) {
+                    await window.showConfirm(
+                        'Firestore 数据库权限未配置，字体将仅保存在本地浏览器中。\n\n请联系管理员配置 Firestore 安全规则。',
+                        '云端同步不可用',
+                        true
+                    );
+                }
+            }
+        }
+        
+        // Save font to Firestore
+        async function saveFontToCloud(fontData) {
+            if (!currentUser) return;
+            try {
+                const fontRef = doc(db, 'users', currentUser.uid, 'fonts', fontData.id.toString());
+                await setDoc(fontRef, fontData);
+            } catch (error) {
+                console.error('Save font error:', error);
+                if (error.code === 'permission-denied') {
+                    console.warn('Firestore permission denied, font saved locally only');
+                    return; // Don't throw error, continue with local save
+                }
+                throw error;
+            }
+        }
+        
+        // Delete font from Firestore
+        async function deleteFontFromCloud(fontId) {
+            if (!currentUser) return;
+            try {
+                await deleteDoc(doc(db, 'users', currentUser.uid, 'fonts', fontId.toString()));
+            } catch (error) {
+                console.error('Delete font error:', error);
+                if (error.code === 'permission-denied') {
+                    console.warn('Firestore permission denied, font deleted locally only');
+                    return; // Don't throw error, continue with local delete
+                }
+                throw error;
+            }
+        }
+        
+        // Expose functions to global scope
+        window.saveFontToCloud = saveFontToCloud;
+        window.deleteFontFromCloud = deleteFontFromCloud;
+        window.getCurrentUser = () => currentUser;
+    </script>
+</body>
+</html>
