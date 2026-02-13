@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FontCraft | 自制字体工坊</title>
+    <title>FontCraft</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Fonts -->
@@ -677,6 +677,12 @@ If words look even and clean, the font works well.</textarea>
                 'syncLocalFontsTitle': '同步本地字体',
                 'firestoreUnavailable': 'Firestore 数据库权限未配置，字体将仅保存在本地浏览器中。\n\n请联系管理员配置 Firestore 安全规则。',
                 'firestoreUnavailableTitle': '云端同步不可用',
+                'loginError': '登录失败：{message}',
+                'loginErrorTitle': '登录错误',
+                'unchangedSave': '字体"{name}"自上次保存以来没有任何更改。是否仍要重复保存？',
+                'unchangedSaveTitle': '内容未更改',
+                'storageQuotaError': '浏览器本地存储空间已满，无法保存字体数据。请删除一些旧字体后重试。',
+                'storageQuotaErrorTitle': '存储空间不足',
                 // Default preview text
                 'defaultPreviewText': 'In 1984, Jack wrote a quick note about a quiet fox and a lazy dog. Lily asked, "Does this font feel clear and friendly?" Jack smiled: "Maybe, but check every letter."\nThey typed a short line: Pack my box with five dozen liquor jugs, and fixed a quirky zebra story.\nFor contact, Jack left an email: fafa27756@mail.com, and added, "Reply before 8:30, ok?"\nThey tried simple marks like . , ! ? : ; ( ) [ ] { } - _ + = @ # & /\nIf words look even and clean, the font works well.'
             },
@@ -741,6 +747,12 @@ If words look even and clean, the font works well.</textarea>
                 'syncLocalFontsTitle': 'Sync Local Fonts',
                 'firestoreUnavailable': 'Firestore database permissions are not configured. Fonts will only be saved locally in your browser.\n\nPlease contact the administrator to configure Firestore security rules.',
                 'firestoreUnavailableTitle': 'Cloud Sync Unavailable',
+                'loginError': 'Login failed: {message}',
+                'loginErrorTitle': 'Login Error',
+                'unchangedSave': 'Font "{name}" has not changed since the last save. Do you still want to save again?',
+                'unchangedSaveTitle': 'No Changes',
+                'storageQuotaError': 'Browser local storage is full. Please delete some old fonts and try again.',
+                'storageQuotaErrorTitle': 'Storage Full',
                 'defaultPreviewText': 'In 1984, Jack wrote a quick note about a quiet fox and a lazy dog. Lily asked, "Does this font feel clear and friendly?" Jack smiled: "Maybe, but check every letter."\nThey typed a short line: Pack my box with five dozen liquor jugs, and fixed a quirky zebra story.\nFor contact, Jack left an email: fafa27756@mail.com, and added, "Reply before 8:30, ok?"\nThey tried simple marks like . , ! ? : ; ( ) [ ] { } - _ + = @ # & /\nIf words look even and clean, the font works well.'
             },
             ja: {
@@ -804,6 +816,12 @@ If words look even and clean, the font works well.</textarea>
                 'syncLocalFontsTitle': 'ローカルフォントを同期',
                 'firestoreUnavailable': 'Firestoreデータベースの権限が設定されていません。フォントはブラウザのローカルにのみ保存されます。\n\n管理者にFirestoreセキュリティルールの設定を依頼してください。',
                 'firestoreUnavailableTitle': 'クラウド同期は利用できません',
+                'loginError': 'ログイン失敗：{message}',
+                'loginErrorTitle': 'ログインエラー',
+                'unchangedSave': 'フォント「{name}」は前回の保存から変更がありません。それでも再度保存しますか？',
+                'unchangedSaveTitle': '変更なし',
+                'storageQuotaError': 'ブラウザのローカルストレージが満杯です。古いフォントを削除してから再試行してください。',
+                'storageQuotaErrorTitle': 'ストレージ不足',
                 'defaultPreviewText': 'In 1984, Jack wrote a quick note about a quiet fox and a lazy dog. Lily asked, "Does this font feel clear and friendly?" Jack smiled: "Maybe, but check every letter."\nThey typed a short line: Pack my box with five dozen liquor jugs, and fixed a quirky zebra story.\nFor contact, Jack left an email: fafa27756@mail.com, and added, "Reply before 8:30, ok?"\nThey tried simple marks like . , ! ? : ; ( ) [ ] { } - _ + = @ # & /\nIf words look even and clean, the font works well.'
             }
         };
@@ -1504,10 +1522,29 @@ If words look even and clean, the font works well.</textarea>
             // If data exists in library, show it
             const existingData = state.library.chars[char];
             if (existingData) {
-                // Use original (uncropped) version for editing display
-                const displayData = existingData.original || existingData;
-                els.svgBgImage.setAttribute('href', displayData);
-                els.svgBgImage.style.display = 'block';
+                // Prefer restoring from stroke data (vector)
+                if (existingData.strokes && existingData.strokes.length > 0) {
+                    // Restore strokes to SVG DOM and state
+                    state.currentStrokes = existingData.strokes.map(s => ({ d: s.d, width: s.width }));
+                    els.svgStrokes.innerHTML = '';
+                    for (const stroke of state.currentStrokes) {
+                        const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                        pathEl.setAttribute('d', stroke.d);
+                        pathEl.setAttribute('stroke', 'black');
+                        pathEl.setAttribute('stroke-width', stroke.width);
+                        pathEl.setAttribute('fill', 'none');
+                        pathEl.setAttribute('stroke-linecap', 'round');
+                        pathEl.setAttribute('stroke-linejoin', 'round');
+                        els.svgStrokes.appendChild(pathEl);
+                    }
+                    els.svgBgImage.style.display = 'none';
+                    updateUndoBtn();
+                } else {
+                    // Legacy fallback: show as background image
+                    const displayData = existingData.original || existingData;
+                    els.svgBgImage.setAttribute('href', displayData);
+                    els.svgBgImage.style.display = 'block';
+                }
             } else {
                 els.svgBgImage.style.display = 'none';
             }
@@ -1645,12 +1682,17 @@ If words look even and clean, the font works well.</textarea>
         }
 
         function saveCurrentCanvas() {
-            // Create SVG for saving
+            // Save stroke vector data for vector font export
+            const strokeData = state.currentStrokes.map(s => ({ d: s.d, width: s.width }));
+            
+            // Create SVG for saving (preview/display)
             const svgContent = els.svg.cloneNode(true);
             const guide = svgContent.querySelector('#svg-guide-text');
             const currentPath = svgContent.querySelector('#svg-current-path');
+            const bgImage = svgContent.querySelector('#svg-bg-image');
             if(guide) guide.remove();
             if(currentPath) currentPath.remove();
+            if(bgImage) bgImage.remove();
             svgContent.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
             
             const svgString = new XMLSerializer().serializeToString(svgContent);
@@ -1701,10 +1743,11 @@ If words look even and clean, the font works well.</textarea>
                     
                     const croppedReader = new FileReader();
                     croppedReader.onload = () => {
-                        // Save both versions
+                        // Save all versions: strokes (vector), original (display), cropped (fallback)
                         state.library.chars[state.selectedChar] = {
                             original: originalBase64,  // For editing/display
-                            cropped: croppedReader.result  // For export
+                            cropped: croppedReader.result,  // For fallback export
+                            strokes: strokeData  // For vector font export
                         };
                 saveLibrary();
                 renderCharacterPicker();
@@ -1822,12 +1865,31 @@ If words look even and clean, the font works well.</textarea>
             const existingFont = state.savedFonts.find(font => font.name === fontName);
             
             if (existingFont) {
-                const confirmed = await showConfirm(
-                    t('duplicateFontName').replace('{name}', fontName), 
-                    t('duplicateFontTitle')
-                );
-                if (!confirmed) {
-                    return; // User cancelled, can rename
+                // Check if content is identical (no changes since last save)
+                const currentCharsKeys = Object.keys(state.library.chars).sort().join(',');
+                const savedCharsKeys = Object.keys(existingFont.chars).sort().join(',');
+                const charsIdentical = currentCharsKeys === savedCharsKeys && 
+                    Object.keys(state.library.chars).every(key => state.library.chars[key] === existingFont.chars[key] || 
+                        (state.library.chars[key]?.cropped === existingFont.chars[key]?.cropped && state.library.chars[key]?.cropped));
+                
+                if (charsIdentical) {
+                    // No changes detected - warn user
+                    const confirmed = await showConfirm(
+                        t('unchangedSave').replace('{name}', fontName),
+                        t('unchangedSaveTitle')
+                    );
+                    if (!confirmed) {
+                        return;
+                    }
+                } else {
+                    // Same name but different content
+                    const confirmed = await showConfirm(
+                        t('duplicateFontName').replace('{name}', fontName), 
+                        t('duplicateFontTitle')
+                    );
+                    if (!confirmed) {
+                        return; // User cancelled, can rename
+                    }
                 }
             }
             
@@ -1852,7 +1914,19 @@ If words look even and clean, the font works well.</textarea>
             
             // Add to saved fonts
             state.savedFonts.push(fontData);
-            localStorage.setItem('fontcraft_saved_fonts', JSON.stringify(state.savedFonts));
+            try {
+                localStorage.setItem('fontcraft_saved_fonts', JSON.stringify(state.savedFonts));
+            } catch (e) {
+                console.error('localStorage save error:', e);
+                if (e.name === 'QuotaExceededError') {
+                    await showConfirm(
+                        t('storageQuotaError'),
+                        t('storageQuotaErrorTitle'),
+                        true
+                    );
+                    // Still keep in memory even if localStorage fails
+                }
+            }
             
             // Show success message
             await showConfirm(
@@ -2059,8 +2133,16 @@ If words look even and clean, the font works well.</textarea>
                     continue;
                 }
                 
-                // Convert image to path
-                const path = await convertImageToPath(charData.cropped || charData);
+                let path;
+                
+                // Prefer vector export from stroke data
+                if (charData.strokes && charData.strokes.length > 0) {
+                    path = await convertStrokesToVectorPath(charData.strokes);
+                } else {
+                    // Fallback: pixel-based export for legacy data
+                    const imgData = (typeof charData === 'object') ? (charData.cropped || charData.original) : charData;
+                    path = await convertImageToPath(imgData);
+                }
                 
                 glyphs.push(new opentype.Glyph({
                     name: char,
@@ -2093,6 +2175,166 @@ If words look even and clean, the font works well.</textarea>
             URL.revokeObjectURL(url);
                 }
 
+        /**
+         * Vector stroke-to-fill conversion for font export.
+         * Converts SVG stroked paths into filled outlines suitable for opentype.js.
+         * Uses browser's getPointAtLength() for accurate path sampling.
+         */
+        async function convertStrokesToVectorPath(strokes) {
+            const svgNS = 'http://www.w3.org/2000/svg';
+            const tempSvg = document.createElementNS(svgNS, 'svg');
+            tempSvg.setAttribute('viewBox', '0 0 500 500');
+            tempSvg.style.position = 'absolute';
+            tempSvg.style.left = '-9999px';
+            tempSvg.style.top = '-9999px';
+            document.body.appendChild(tempSvg);
+
+            const SVG_SIZE = 500;
+            const UNITS_PER_EM = 1000;
+            const scale = UNITS_PER_EM / SVG_SIZE; // = 2
+            // Baseline: guide text is at y=410 in SVG, maps to (500-410)*2 = 180 in OT coords
+            const baselineOffset = -180;
+
+            // Step 1: Generate outline points for all strokes in SVG space
+            const allOutlines = [];
+            let globalMinX = Infinity, globalMaxX = -Infinity;
+
+            for (const stroke of strokes) {
+                const pathEl = document.createElementNS(svgNS, 'path');
+                pathEl.setAttribute('d', stroke.d);
+                tempSvg.appendChild(pathEl);
+
+                const totalLength = pathEl.getTotalLength();
+                if (totalLength < 0.5) {
+                    tempSvg.removeChild(pathEl);
+                    continue;
+                }
+
+                const halfWidth = stroke.width / 2;
+                // Adaptive sampling: ~2 SVG-unit steps, minimum 20 samples
+                const numSamples = Math.max(Math.ceil(totalLength / 2), 20);
+
+                const leftPoints = [];
+                const rightPoints = [];
+                let startTangent, endTangent, startPoint, endPoint;
+
+                for (let i = 0; i <= numSamples; i++) {
+                    const t = (i / numSamples) * totalLength;
+                    const pt = pathEl.getPointAtLength(t);
+
+                    // Compute tangent via finite difference
+                    const dt = Math.min(0.5, totalLength * 0.001);
+                    const p1 = pathEl.getPointAtLength(Math.max(0, t - dt));
+                    const p2 = pathEl.getPointAtLength(Math.min(totalLength, t + dt));
+
+                    let dx = p2.x - p1.x;
+                    let dy = p2.y - p1.y;
+                    const len = Math.sqrt(dx * dx + dy * dy);
+                    if (len > 1e-6) { dx /= len; dy /= len; }
+                    else { dx = 1; dy = 0; }
+
+                    if (i === 0) { startTangent = { x: dx, y: dy }; startPoint = { x: pt.x, y: pt.y }; }
+                    if (i === numSamples) { endTangent = { x: dx, y: dy }; endPoint = { x: pt.x, y: pt.y }; }
+
+                    // Normal: perpendicular to tangent (rotated -90°)
+                    const nx = -dy;
+                    const ny = dx;
+
+                    leftPoints.push({ x: pt.x + nx * halfWidth, y: pt.y + ny * halfWidth });
+                    rightPoints.push({ x: pt.x - nx * halfWidth, y: pt.y - ny * halfWidth });
+
+                    // Track horizontal bounds (including stroke width)
+                    globalMinX = Math.min(globalMinX, pt.x - halfWidth);
+                    globalMaxX = Math.max(globalMaxX, pt.x + halfWidth);
+                }
+
+                // Generate round end cap: from left[n] → right[n] curving outward
+                const endCap = generateSemiCircle(endPoint, endTangent, halfWidth, 10);
+                // Generate round start cap: from right[0] → left[0] curving outward (reverse tangent)
+                const startCap = generateSemiCircle(startPoint, { x: -startTangent.x, y: -startTangent.y }, halfWidth, 10);
+
+                allOutlines.push({ leftPoints, rightPoints, endCap, startCap });
+                tempSvg.removeChild(pathEl);
+            }
+
+            document.body.removeChild(tempSvg);
+
+            // Guard: if no outlines were generated, return empty path
+            if (allOutlines.length === 0) {
+                return { opentypePath: new opentype.Path(), advanceWidth: 375 };
+            }
+
+            // Step 2: Compute crop parameters (horizontal only, like original)
+            const padding = 20;
+            const cropX = Math.max(0, globalMinX - padding);
+            const cropMaxX = Math.min(SVG_SIZE, globalMaxX + padding);
+            const cropWidth = cropMaxX - cropX;
+
+            // Step 3: Build opentype.js path with coordinate transform
+            const opentypePath = new opentype.Path();
+
+            const txCoord = (x) => (x - cropX) * scale;
+            const tyCoord = (y) => (SVG_SIZE - y) * scale + baselineOffset;
+
+            for (const outline of allOutlines) {
+                // TrueType requires clockwise winding for outer contours (Y-up).
+                // After Y-flip transform, we need: right forward → endCap(rev) → left backward → startCap(rev)
+                const { leftPoints, rightPoints, endCap, startCap } = outline;
+
+                // Start at first right point
+                opentypePath.moveTo(txCoord(rightPoints[0].x), tyCoord(rightPoints[0].y));
+
+                // Forward along right outline
+                for (let i = 1; i < rightPoints.length; i++) {
+                    opentypePath.lineTo(txCoord(rightPoints[i].x), tyCoord(rightPoints[i].y));
+                }
+
+                // End cap reversed (from right[n] toward left[n])
+                for (let i = endCap.length - 1; i >= 0; i--) {
+                    opentypePath.lineTo(txCoord(endCap[i].x), tyCoord(endCap[i].y));
+                }
+
+                // Backward along left outline
+                for (let i = leftPoints.length - 1; i >= 0; i--) {
+                    opentypePath.lineTo(txCoord(leftPoints[i].x), tyCoord(leftPoints[i].y));
+                }
+
+                // Start cap reversed (from left[0] toward right[0])
+                for (let i = startCap.length - 1; i >= 0; i--) {
+                    opentypePath.lineTo(txCoord(startCap[i].x), tyCoord(startCap[i].y));
+                }
+
+                opentypePath.close();
+            }
+
+            return {
+                opentypePath: opentypePath,
+                advanceWidth: Math.max(cropWidth * scale, 100)
+            };
+        }
+
+        /**
+         * Generate semicircle points for round line caps.
+         * Goes from the left side to the right side of the stroke end,
+         * curving outward in the direction of the tangent.
+         */
+        function generateSemiCircle(center, tangent, radius, segments) {
+            const points = [];
+            // Left normal of the tangent
+            const nx = -tangent.y;
+            const ny = tangent.x;
+
+            for (let i = 0; i <= segments; i++) {
+                const theta = Math.PI * i / segments;
+                points.push({
+                    x: center.x + radius * (nx * Math.cos(theta) + tangent.x * Math.sin(theta)),
+                    y: center.y + radius * (ny * Math.cos(theta) + tangent.y * Math.sin(theta))
+                });
+            }
+            return points;
+        }
+
+        /** Fallback: pixel-based path conversion for legacy data without strokes **/
         async function convertImageToPath(dataUrl) {
             return new Promise((resolve, reject) => {
                     const img = new Image();
@@ -2110,14 +2352,10 @@ If words look even and clean, the font works well.</textarea>
                     
                     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                     const path = new opentype.Path();
-                    const scale = 1000 / canvas.height;
-                    const blockSize = 4; // Larger blocks for smoother output
-                    
-                    // Baseline offset to align with font metrics
-                    // Adjust Y position to match reference letter baseline
+                    const scl = 1000 / canvas.height;
+                    const blockSize = 4;
                     const baselineOffset = -180;
                     
-                    // Trace pixels to create path
                     for (let y = 0; y < canvas.height; y += blockSize) {
                         for (let x = 0; x < canvas.width; x += blockSize) {
                             const i = (y * canvas.width + x) * 4;
@@ -2125,13 +2363,11 @@ If words look even and clean, the font works well.</textarea>
                             const g = imageData.data[i + 1];
                             const b = imageData.data[i + 2];
                                 
-                            // Check if pixel is dark (has ink)
                                 if (r < 128 && g < 128 && b < 128) {
-                                    const sx = x * scale;
-                                const sy = (canvas.height - y - blockSize) * scale + baselineOffset;
-                                const size = blockSize * scale;
+                                    const sx = x * scl;
+                                const sy = (canvas.height - y - blockSize) * scl + baselineOffset;
+                                const size = blockSize * scl;
                                 
-                                // Draw small rectangle
                                 path.moveTo(sx, sy);
                                 path.lineTo(sx + size, sy);
                                 path.lineTo(sx + size, sy + size);
@@ -2143,7 +2379,7 @@ If words look even and clean, the font works well.</textarea>
                         
                     resolve({
                         opentypePath: path,
-                        advanceWidth: canvas.width * scale
+                        advanceWidth: canvas.width * scl
                     });
                     };
                 img.onerror = () => reject(new Error('Failed to load image'));
@@ -2165,6 +2401,7 @@ If words look even and clean, the font works well.</textarea>
 
         // Expose state and functions to window for Firebase module
         window.state = state;
+        window.translations = translations;
         window.renderFontLibrary = renderFontLibrary;
         window.showConfirm = showConfirm;
 
@@ -2217,9 +2454,10 @@ If words look even and clean, the font works well.</textarea>
                 // Check if user has local fonts
                 const localFonts = JSON.parse(localStorage.getItem('fontcraft_saved_fonts')) || [];
                 if (localFonts.length > 0) {
+                    const t = (key) => window.state && window.translations ? window.translations[window.state.currentLang][key] || key : key;
                     const confirmed = await window.showConfirm(
-                        `检测到您本地保存了 ${localFonts.length} 个字体。是否要将这些字体添加到您的账号中？`,
-                        '同步本地字体'
+                        t('syncLocalFonts').replace('{count}', localFonts.length),
+                        t('syncLocalFontsTitle')
                     );
                     if (confirmed) {
                         // Upload local fonts to cloud and mark as synced
@@ -2228,7 +2466,11 @@ If words look even and clean, the font works well.</textarea>
                             font.synced = true;
                         }
                         // Update localStorage with synced status
-                        localStorage.setItem('fontcraft_saved_fonts', JSON.stringify(localFonts));
+                        try {
+                            localStorage.setItem('fontcraft_saved_fonts', JSON.stringify(localFonts));
+                        } catch (e) {
+                            console.error('localStorage save error:', e);
+                        }
                     }
                 }
                 
@@ -2236,7 +2478,8 @@ If words look even and clean, the font works well.</textarea>
                 await loadUserFonts(currentUser.uid);
             } catch (error) {
                 console.error('Login error:', error);
-                await window.showConfirm('登录失败：' + error.message, '登录错误', true);
+                const t = (key) => window.state && window.translations ? window.translations[window.state.currentLang][key] || key : key;
+                await window.showConfirm(t('loginError').replace('{message}', error.message), t('loginErrorTitle'), true);
             }
         });
         
@@ -2326,9 +2569,10 @@ If words look even and clean, the font works well.</textarea>
                 
                 // Show warning
                 if (error.code === 'permission-denied' && window.showConfirm) {
+                    const t = (key) => window.state && window.translations ? window.translations[window.state.currentLang][key] || key : key;
                     await window.showConfirm(
-                        'Firestore 数据库权限未配置，字体将仅保存在本地浏览器中。\n\n请联系管理员配置 Firestore 安全规则。',
-                        '云端同步不可用',
+                        t('firestoreUnavailable'),
+                        t('firestoreUnavailableTitle'),
                         true
                     );
                 }
