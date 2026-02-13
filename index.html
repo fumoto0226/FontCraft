@@ -2474,6 +2474,7 @@ If words look even and clean, the font works well.</textarea>
         window.editFont = editFont;
         window.deleteSavedFont = deleteSavedFont;
         window.downloadSavedFont = downloadSavedFont;
+        window.migrateOldCharData = migrateOldCharData;
 
         // Run
         init();
@@ -2521,8 +2522,8 @@ If words look even and clean, the font works well.</textarea>
                 const result = await signInWithPopup(auth, provider);
                 currentUser = result.user;
                 
-                // Check if user has local fonts
-                const localFonts = JSON.parse(localStorage.getItem('fontcraft_saved_fonts')) || [];
+                // Check if user has local fonts (use in-memory state which is already migrated)
+                const localFonts = (window.state && window.state.savedFonts) || [];
                 if (localFonts.length > 0) {
                     const t = (key) => window.state && window.translations ? window.translations[window.state.currentLang][key] || key : key;
                     const confirmed = await window.showConfirm(
@@ -2530,17 +2531,19 @@ If words look even and clean, the font works well.</textarea>
                         t('syncLocalFontsTitle')
                     );
                     if (confirmed) {
-                        // Upload local fonts to cloud and mark as synced
+                        // Upload local fonts to cloud (saveFontToCloud strips heavy data)
                         for (const font of localFonts) {
-                            await saveFontToCloud(font);
-                            font.synced = true;
+                            try {
+                                await saveFontToCloud(font);
+                                font.synced = true;
+                            } catch (e) {
+                                console.error('Failed to sync font:', font.name, e);
+                            }
                         }
                         // Update localStorage with synced status
                         try {
                             localStorage.setItem('fontcraft_saved_fonts', JSON.stringify(localFonts));
-                        } catch (e) {
-                            console.error('localStorage save error:', e);
-                        }
+                        } catch (e) { /* ignore quota errors */ }
                     }
                 }
                 
@@ -2649,17 +2652,44 @@ If words look even and clean, the font works well.</textarea>
             }
         }
         
-        // Save font to Firestore
+        // Save font to Firestore (lightweight strokes-only data)
         async function saveFontToCloud(fontData) {
             if (!currentUser) return;
             try {
+                // Strip heavy base64 data — only upload strokes for each character
+                const lightChars = {};
+                if (fontData.chars) {
+                    for (const [char, data] of Object.entries(fontData.chars)) {
+                        if (data && data.strokes && data.strokes.length > 0) {
+                            lightChars[char] = { strokes: data.strokes };
+                        } else if (typeof data === 'string' || (data && (data.original || data.cropped))) {
+                            // Old format: try to migrate before uploading
+                            const migrated = window.migrateOldCharData ? window.migrateOldCharData(data) : data;
+                            if (migrated && migrated.strokes) {
+                                lightChars[char] = { strokes: migrated.strokes };
+                            }
+                            // Skip chars that can't be migrated (avoid uploading huge base64)
+                        } else if (data) {
+                            lightChars[char] = data;
+                        }
+                    }
+                }
+                
+                const lightFontData = {
+                    id: fontData.id,
+                    name: fontData.name,
+                    createdAt: fontData.createdAt,
+                    chars: lightChars,
+                    synced: true
+                };
+                
                 const fontRef = doc(db, 'users', currentUser.uid, 'fonts', fontData.id.toString());
-                await setDoc(fontRef, fontData);
+                await setDoc(fontRef, lightFontData);
             } catch (error) {
                 console.error('Save font error:', error);
                 if (error.code === 'permission-denied') {
                     console.warn('Firestore permission denied, font saved locally only');
-                    return; // Don't throw error, continue with local save
+                    return;
                 }
                 throw error;
             }
