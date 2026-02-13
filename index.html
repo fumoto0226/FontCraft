@@ -1324,8 +1324,50 @@ If words look even and clean, the font works well.</textarea>
             els.brushPreviewDot.style.height = `${sizePx}px`;
         }
 
+        /**
+         * Generate an SVG data URL from stroke data (for preview rendering).
+         * This is lightweight and avoids storing huge base64 images.
+         */
+        function strokesToSvgDataUrl(strokes, viewBox) {
+            const vb = viewBox || '0 0 500 500';
+            let paths = '';
+            for (const s of strokes) {
+                paths += `<path d="${s.d}" stroke="black" stroke-width="${s.width}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+            }
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${vb}">${paths}</svg>`;
+            return 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svg)));
+        }
+
+        /**
+         * Get a preview image URL from character data.
+         * Handles both new format (strokes-only) and legacy format (base64 images).
+         */
+        function getCharPreviewUrl(charData) {
+            if (!charData) return '';
+            if (typeof charData === 'string') return charData; // Legacy: raw data URL
+            if (charData.cropped) return charData.cropped;     // Has cached cropped image
+            if (charData.strokes && charData.strokes.length > 0) {
+                return strokesToSvgDataUrl(charData.strokes);  // Generate from strokes
+            }
+            if (charData.original) return charData.original;   // Fallback to original
+            return '';
+        }
+
         function saveLibrary() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(state.library));
+            // Save lightweight version: only strokes (not heavy base64 images)
+            const lightLibrary = { name: state.library.name, chars: {} };
+            for (const [char, data] of Object.entries(state.library.chars)) {
+                if (data && data.strokes && data.strokes.length > 0) {
+                    lightLibrary.chars[char] = { strokes: data.strokes };
+                } else {
+                    lightLibrary.chars[char] = data; // Legacy: keep as-is
+                }
+            }
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(lightLibrary));
+            } catch (e) {
+                console.warn('localStorage save warning:', e.message);
+            }
             updateNav();
         }
 
@@ -1541,9 +1583,11 @@ If words look even and clean, the font works well.</textarea>
                     updateUndoBtn();
                 } else {
                     // Legacy fallback: show as background image
-                    const displayData = existingData.original || existingData;
-                    els.svgBgImage.setAttribute('href', displayData);
-                    els.svgBgImage.style.display = 'block';
+                    const displayData = getCharPreviewUrl(existingData);
+                    if (displayData) {
+                        els.svgBgImage.setAttribute('href', displayData);
+                        els.svgBgImage.style.display = 'block';
+                    }
                 }
             } else {
                 els.svgBgImage.style.display = 'none';
@@ -1682,105 +1726,12 @@ If words look even and clean, the font works well.</textarea>
         }
 
         function saveCurrentCanvas() {
-            // Save stroke vector data for vector font export
-            const strokeData = state.currentStrokes.map(s => ({ d: s.d, width: s.width }));
-            
-            // Create SVG for saving (preview/display)
-            const svgContent = els.svg.cloneNode(true);
-            const guide = svgContent.querySelector('#svg-guide-text');
-            const currentPath = svgContent.querySelector('#svg-current-path');
-            const bgImage = svgContent.querySelector('#svg-bg-image');
-            if(guide) guide.remove();
-            if(currentPath) currentPath.remove();
-            if(bgImage) bgImage.remove();
-            svgContent.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-            
-            const svgString = new XMLSerializer().serializeToString(svgContent);
-            
-            // Save original (uncropped) version for editing
-            const originalBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-            const originalReader = new FileReader();
-            originalReader.onload = () => {
-                const originalBase64 = originalReader.result;
-                
-                // Now create cropped version for export
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d', { willReadFrequently: true });
-                canvas.width = 500;
-                canvas.height = 500;
-                
-                const img = new Image();
-                img.onload = () => {
-                    // Draw to canvas
-                    ctx.fillStyle = 'white';
-                    ctx.fillRect(0, 0, 500, 500);
-                    ctx.drawImage(img, 0, 0, 500, 500);
-                    
-                    // Detect left and right bounds only
-                    const imageData = ctx.getImageData(0, 0, 500, 500);
-                    const bounds = detectHorizontalBounds(imageData.data, 500, 500);
-                    
-                    if (!bounds) {
-                        // No content drawn
-                        return;
-                    }
-                    
-                    // Add padding (20 pixels on left and right)
-                    const padding = 20;
-                    const cropX = Math.max(0, bounds.minX - padding);
-                    const cropY = 0; // Keep full height from top
-                    const cropWidth = Math.min(500, bounds.maxX + padding) - cropX;
-                    const cropHeight = 500; // Keep full height
-                    
-                    // Create cropped SVG with proper viewBox
-                    const croppedSvg = svgContent.cloneNode(true);
-                    croppedSvg.setAttribute('viewBox', `${cropX} ${cropY} ${cropWidth} ${cropHeight}`);
-                    croppedSvg.setAttribute('width', cropWidth);
-                    croppedSvg.setAttribute('height', cropHeight);
-                    
-                    const croppedString = new XMLSerializer().serializeToString(croppedSvg);
-                    const croppedBlob = new Blob([croppedString], { type: 'image/svg+xml;charset=utf-8' });
-                    
-                    const croppedReader = new FileReader();
-                    croppedReader.onload = () => {
-                        // Save all versions: strokes (vector), original (display), cropped (fallback)
-                        state.library.chars[state.selectedChar] = {
-                            original: originalBase64,  // For editing/display
-                            cropped: croppedReader.result,  // For fallback export
-                            strokes: strokeData  // For vector font export
-                        };
-                saveLibrary();
-                renderCharacterPicker();
+            // Only save lightweight stroke data — no more heavy base64 SVG images!
+            state.library.chars[state.selectedChar] = {
+                strokes: state.currentStrokes.map(s => ({ d: s.d, width: s.width }))
             };
-                    croppedReader.readAsDataURL(croppedBlob);
-                };
-                
-                img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgString)));
-            };
-            originalReader.readAsDataURL(originalBlob);
-        }
-        
-        function detectHorizontalBounds(pixels, width, height) {
-            let minX = width, maxX = 0;
-            let hasContent = false;
-            
-            for (let y = 0; y < height; y++) {
-                for (let x = 0; x < width; x++) {
-                    const i = (y * width + x) * 4;
-                    const r = pixels[i];
-                    const g = pixels[i + 1];
-                    const b = pixels[i + 2];
-                    
-                    // Check if pixel is not white (has ink)
-                    if (r < 250 || g < 250 || b < 250) {
-                        hasContent = true;
-                        if (x < minX) minX = x;
-                        if (x > maxX) maxX = x;
-                    }
-                }
-            }
-            
-            return hasContent ? { minX, maxX } : null;
+            saveLibrary();
+            renderCharacterPicker();
         }
 
         /** Preview Logic **/
@@ -1827,7 +1778,7 @@ If words look even and clean, the font works well.</textarea>
                 if (charData) {
                     const img = document.createElement('img');
                         // Use cropped version for preview
-                        img.src = charData.cropped || charData;
+                        img.src = getCharPreviewUrl(charData);
                     img.style.height = `${state.previewSize * 1.1}px`; // Make drawn characters slightly larger
                     img.style.width = 'auto';
                     img.style.verticalAlign = 'bottom';
@@ -1869,8 +1820,16 @@ If words look even and clean, the font works well.</textarea>
                 const currentCharsKeys = Object.keys(state.library.chars).sort().join(',');
                 const savedCharsKeys = Object.keys(existingFont.chars).sort().join(',');
                 const charsIdentical = currentCharsKeys === savedCharsKeys && 
-                    Object.keys(state.library.chars).every(key => state.library.chars[key] === existingFont.chars[key] || 
-                        (state.library.chars[key]?.cropped === existingFont.chars[key]?.cropped && state.library.chars[key]?.cropped));
+                    Object.keys(state.library.chars).every(key => {
+                        const cur = state.library.chars[key];
+                        const saved = existingFont.chars[key];
+                        if (!cur || !saved) return cur === saved;
+                        // Compare strokes data
+                        if (cur.strokes && saved.strokes) {
+                            return JSON.stringify(cur.strokes) === JSON.stringify(saved.strokes);
+                        }
+                        return cur === saved || (cur?.cropped === saved?.cropped && cur?.cropped);
+                    });
                 
                 if (charsIdentical) {
                     // No changes detected - warn user
@@ -1893,47 +1852,59 @@ If words look even and clean, the font works well.</textarea>
                 }
             }
             
-            // Create a deep copy of current library with all characters
+            // Create lightweight copy: only store strokes data (not heavy base64 images)
+            const lightChars = {};
+            for (const [char, data] of Object.entries(state.library.chars)) {
+                if (data && data.strokes && data.strokes.length > 0) {
+                    lightChars[char] = { strokes: data.strokes };
+                } else {
+                    lightChars[char] = data; // Legacy: keep as-is
+                }
+            }
+            
             const fontData = {
                 id: Date.now(),
                 name: fontName,
                 createdAt: new Date().toISOString(),
-                chars: { ...state.library.chars },
-                synced: false  // Mark as not synced initially
+                chars: lightChars,
+                synced: false
             };
             
             // Save to cloud if logged in
             if (window.getCurrentUser && window.getCurrentUser()) {
                 try {
                     await window.saveFontToCloud(fontData);
-                    fontData.synced = true;  // Mark as synced after successful upload
+                    fontData.synced = true;
                 } catch (error) {
                     console.error('Failed to save to cloud:', error);
                 }
             }
             
-            // Add to saved fonts
+            // Add to saved fonts and persist
             state.savedFonts.push(fontData);
+            let storageFailed = false;
             try {
                 localStorage.setItem('fontcraft_saved_fonts', JSON.stringify(state.savedFonts));
             } catch (e) {
                 console.error('localStorage save error:', e);
                 if (e.name === 'QuotaExceededError') {
+                    storageFailed = true;
                     await showConfirm(
                         t('storageQuotaError'),
                         t('storageQuotaErrorTitle'),
                         true
                     );
-                    // Still keep in memory even if localStorage fails
                 }
             }
             
-            // Show success message
-            await showConfirm(
-                t('saveFontSuccess').replace('{name}', fontName), 
-                t('saveFontSuccessTitle'),
-                true  // Only show OK button
-            );
+            // Only show success if storage didn't fail
+            if (!storageFailed) {
+                await showConfirm(
+                    t('saveFontSuccess').replace('{name}', fontName), 
+                    t('saveFontSuccessTitle'),
+                    true
+                );
+            }
         }
         
         function renderFontLibrary() {
@@ -1964,7 +1935,7 @@ If words look even and clean, the font works well.</textarea>
                     if (count >= maxPreview) break;
                     const charData = font.chars[char];
                     if (charData) {
-                        const src = charData.cropped || charData;
+                        const src = getCharPreviewUrl(charData);
                         previewHTML += `<img src="${src}" style="height: 28px; width: auto; vertical-align: bottom; margin-right: 2px;" alt="${char}">`;
                         count++;
                     }
@@ -2140,7 +2111,7 @@ If words look even and clean, the font works well.</textarea>
                     path = await convertStrokesToVectorPath(charData.strokes);
                 } else {
                     // Fallback: pixel-based export for legacy data
-                    const imgData = (typeof charData === 'object') ? (charData.cropped || charData.original) : charData;
+                    const imgData = getCharPreviewUrl(charData);
                     path = await convertImageToPath(imgData);
                 }
                 
