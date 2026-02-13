@@ -1049,11 +1049,26 @@ If words look even and clean, the font works well.</textarea>
                 els.labelLangMobile.textContent = labels[state.currentLang] || 'English';
             }
             
+            // Migrate old-format data (base64 SVG → strokes) for vector export support
+            const workingMigrated = migrateLibrary(state.library);
+            if (workingMigrated > 0) saveLibrary();
+            
+            let savedMigrated = 0;
+            for (const font of state.savedFonts) {
+                savedMigrated += migrateLibrary(font) || 0;
+            }
+            if (savedMigrated > 0) {
+                try {
+                    localStorage.setItem('fontcraft_saved_fonts', JSON.stringify(state.savedFonts));
+                } catch (e) { /* ignore quota errors during migration */ }
+            }
+            
             // Initialize UI
             lucide.createIcons();
             setupEventListeners();
             updateUILanguage(); // Apply translations + active lang indicator
             renderCharacterPicker();
+            renderFontLibrary();
             updateCanvasView();
             updateBrushPreview();
             updateNav();
@@ -1351,6 +1366,79 @@ If words look even and clean, the font works well.</textarea>
             }
             if (charData.original) return charData.original;   // Fallback to original
             return '';
+        }
+
+        /**
+         * Migrate old-format character data (base64 SVG images) to new strokes format.
+         * Parses the SVG to extract <path> elements and rebuild stroke data.
+         * This enables vector export for characters drawn with the old version.
+         */
+        function migrateOldCharData(charData) {
+            // Already has strokes — no migration needed
+            if (charData && charData.strokes && charData.strokes.length > 0) return charData;
+            
+            // Get the SVG data URL to parse
+            let svgDataUrl;
+            if (typeof charData === 'string') {
+                svgDataUrl = charData;
+            } else if (charData && typeof charData === 'object') {
+                svgDataUrl = charData.original || charData.cropped;
+            }
+            if (!svgDataUrl || !svgDataUrl.startsWith('data:image/svg+xml')) return charData;
+            
+            try {
+                // Decode the base64 SVG
+                let svgString;
+                if (svgDataUrl.includes(';base64,')) {
+                    const base64Part = svgDataUrl.split(';base64,')[1];
+                    svgString = decodeURIComponent(escape(atob(base64Part)));
+                } else {
+                    svgString = decodeURIComponent(svgDataUrl.split(',')[1]);
+                }
+                
+                // Parse SVG and extract path elements
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(svgString, 'image/svg+xml');
+                const paths = doc.querySelectorAll('path');
+                
+                const strokes = [];
+                paths.forEach(path => {
+                    const d = path.getAttribute('d');
+                    const strokeWidth = parseFloat(path.getAttribute('stroke-width'));
+                    const fill = path.getAttribute('fill');
+                    // Only take stroked paths (not filled shapes or empty paths)
+                    if (d && d.length > 2 && strokeWidth > 0 && fill === 'none') {
+                        strokes.push({ d, width: strokeWidth });
+                    }
+                });
+                
+                if (strokes.length > 0) {
+                    return { strokes };
+                }
+            } catch (e) {
+                console.warn('Migration failed for char data:', e);
+            }
+            
+            return charData; // Return original if migration fails
+        }
+
+        /**
+         * Migrate all character data in a library from old format to new strokes format.
+         */
+        function migrateLibrary(library) {
+            if (!library || !library.chars) return;
+            let migrated = 0;
+            for (const [char, data] of Object.entries(library.chars)) {
+                const newData = migrateOldCharData(data);
+                if (newData !== data) {
+                    library.chars[char] = newData;
+                    migrated++;
+                }
+            }
+            if (migrated > 0) {
+                console.log(`Migrated ${migrated} characters from old format to strokes format`);
+            }
+            return migrated;
         }
 
         function saveLibrary() {
@@ -2038,21 +2126,29 @@ If words look even and clean, the font works well.</textarea>
         }
         
         async function deleteSavedFont(index) {
-            const font = state.savedFonts[index];
-            const confirmed = await showConfirm(t('deleteConfirm').replace('{name}', font.name), t('confirmTitle'));
-            if (confirmed) {
-                // Delete from cloud if logged in
-                if (window.getCurrentUser && window.getCurrentUser()) {
-                    try {
-                        await window.deleteFontFromCloud(font.id);
-                    } catch (error) {
-                        console.error('Failed to delete from cloud:', error);
-                    }
-                }
+            try {
+                const font = state.savedFonts[index];
+                if (!font) return;
                 
-                state.savedFonts.splice(index, 1);
-                localStorage.setItem('fontcraft_saved_fonts', JSON.stringify(state.savedFonts));
-                renderFontLibrary();
+                const confirmed = await showConfirm(t('deleteConfirm').replace('{name}', font.name), t('confirmTitle'));
+                if (confirmed) {
+                    // Delete from cloud if logged in
+                    if (window.getCurrentUser && window.getCurrentUser()) {
+                        try {
+                            await window.deleteFontFromCloud(font.id);
+                        } catch (error) {
+                            console.error('Failed to delete from cloud:', error);
+                        }
+                    }
+                    
+                    state.savedFonts.splice(index, 1);
+                    try {
+                        localStorage.setItem('fontcraft_saved_fonts', JSON.stringify(state.savedFonts));
+                    } catch (e) { /* ignore quota errors */ }
+                    renderFontLibrary();
+                }
+            } catch (error) {
+                console.error('Delete font error:', error);
             }
         }
 
@@ -2182,8 +2278,8 @@ If words look even and clean, the font works well.</textarea>
                 }
 
                 const halfWidth = stroke.width / 2;
-                // Adaptive sampling: ~2 SVG-unit steps, minimum 20 samples
-                const numSamples = Math.max(Math.ceil(totalLength / 2), 20);
+                // Adaptive sampling: ~1.5 SVG-unit steps for smooth outlines, minimum 30 samples
+                const numSamples = Math.max(Math.ceil(totalLength / 1.5), 30);
 
                 const leftPoints = [];
                 const rightPoints = [];
@@ -2219,10 +2315,10 @@ If words look even and clean, the font works well.</textarea>
                     globalMaxX = Math.max(globalMaxX, pt.x + halfWidth);
                 }
 
-                // Generate round end cap: from left[n] → right[n] curving outward
-                const endCap = generateSemiCircle(endPoint, endTangent, halfWidth, 10);
+                // Generate round end cap: from left[n] → right[n] curving outward (16 segments for smooth caps)
+                const endCap = generateSemiCircle(endPoint, endTangent, halfWidth, 16);
                 // Generate round start cap: from right[0] → left[0] curving outward (reverse tangent)
-                const startCap = generateSemiCircle(startPoint, { x: -startTangent.x, y: -startTangent.y }, halfWidth, 10);
+                const startCap = generateSemiCircle(startPoint, { x: -startTangent.x, y: -startTangent.y }, halfWidth, 16);
 
                 allOutlines.push({ leftPoints, rightPoints, endCap, startCap });
                 tempSvg.removeChild(pathEl);
@@ -2370,11 +2466,14 @@ If words look even and clean, the font works well.</textarea>
             URL.revokeObjectURL(url);
         }
 
-        // Expose state and functions to window for Firebase module
+        // Expose state and functions to window for Firebase module and onclick handlers
         window.state = state;
         window.translations = translations;
         window.renderFontLibrary = renderFontLibrary;
         window.showConfirm = showConfirm;
+        window.editFont = editFont;
+        window.deleteSavedFont = deleteSavedFont;
+        window.downloadSavedFont = downloadSavedFont;
 
         // Run
         init();
