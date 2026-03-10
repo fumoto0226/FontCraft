@@ -333,7 +333,7 @@
                             <p class="text-slate-500 text-xs mt-1 font-bold" data-i18n="selectCharacterDesc">选择字符开始绘制</p>
                         </div>
                         <div class="flex items-stretch gap-3 h-12">
-                            <button id="btn-reset-library" class="cartoon-btn flex items-center justify-center gap-1.5 px-4 h-full rounded-lg bg-white text-black font-bold text-sm hover:bg-slate-50" title="重置字库">
+                            <button id="btn-reset-library" class="cartoon-btn flex items-center justify-center gap-1.5 px-4 h-full rounded-lg bg-white text-black font-bold text-sm hover:bg-slate-50" title="重置字库" data-i18n-title="resetLibraryTitle">
                                 <i data-lucide="rotate-ccw" width="16"></i> <span data-i18n="reset">重置</span>
                             </button>
                             <div class="flex items-center gap-2 px-5 h-full rounded-lg bg-slate-100 border-2 border-black shadow-[2px_2px_0px_0px_#000] text-black">
@@ -666,8 +666,12 @@ If words look even and clean, the font works well.</textarea>
                 'cancel': '取消',
                 'confirm': '确定',
                 'resetAllConfirm': '确定要重置所有字符吗？这将清除所有已绘制的字符。',
-                'resetCategoryConfirm': '确定要重置这个分类的所有字符吗？',
+                'resetLibraryTitle': '重置字库',
+                'resetLibraryConfirm': '确定要重置吗？这将清空您绘制的所有字母，此操作无法撤销！',
+                'resetCategoryTitle': '重置分类',
+                'resetCategoryConfirm': '确定要重置“{name}”中的所有字符吗？',
                 'deleteConfirm': '确定要删除字体 "{name}" 吗？',
+                'restoreContentTitle': '还原文字',
                 'restoreContentConfirm': '确定要还原预览文字到初始状态吗？',
                 'saveFontSuccess': '字体"{name}"已成功保存到字体库！',
                 'saveFontSuccessTitle': '保存成功',
@@ -736,8 +740,12 @@ If words look even and clean, the font works well.</textarea>
                 'cancel': 'Cancel',
                 'confirm': 'OK',
                 'resetAllConfirm': 'Are you sure you want to reset all characters? This will clear all drawn characters.',
-                'resetCategoryConfirm': 'Are you sure you want to reset all characters in this category?',
+                'resetLibraryTitle': 'Reset Font Library',
+                'resetLibraryConfirm': 'Are you sure you want to reset the font library? This will clear all letters you have drawn, and this action cannot be undone.',
+                'resetCategoryTitle': 'Reset Category',
+                'resetCategoryConfirm': 'Are you sure you want to reset all characters in "{name}"?',
                 'deleteConfirm': 'Are you sure you want to delete font "{name}"?',
+                'restoreContentTitle': 'Restore Content',
                 'restoreContentConfirm': 'Are you sure you want to restore the preview text to its initial state?',
                 'saveFontSuccess': 'Font "{name}" has been successfully saved to the library!',
                 'saveFontSuccessTitle': 'Save Successful',
@@ -805,8 +813,12 @@ If words look even and clean, the font works well.</textarea>
                 'cancel': 'キャンセル',
                 'confirm': 'OK',
                 'resetAllConfirm': 'すべての文字をリセットしてもよろしいですか？描画したすべての文字が消去されます。',
-                'resetCategoryConfirm': 'このカテゴリのすべての文字をリセットしてもよろしいですか？',
+                'resetLibraryTitle': 'フォントライブラリをリセット',
+                'resetLibraryConfirm': 'フォントライブラリをリセットしてもよろしいですか？描画したすべての文字が消去され、この操作は元に戻せません。',
+                'resetCategoryTitle': 'カテゴリをリセット',
+                'resetCategoryConfirm': '「{name}」内のすべての文字をリセットしてもよろしいですか？',
                 'deleteConfirm': 'フォント「{name}」を削除してもよろしいですか？',
+                'restoreContentTitle': '内容を復元',
                 'restoreContentConfirm': 'プレビューテキストを初期状態に復元してもよろしいですか？',
                 'saveFontSuccess': 'フォント「{name}」がライブラリに正常に保存されました！',
                 'saveFontSuccessTitle': '保存成功',
@@ -872,6 +884,13 @@ If words look even and clean, the font works well.</textarea>
                 const key = el.getAttribute('data-i18n-placeholder');
                 if (translations[state.currentLang][key]) {
                     el.placeholder = translations[state.currentLang][key];
+                }
+            });
+
+            document.querySelectorAll('[data-i18n-title]').forEach(el => {
+                const key = el.getAttribute('data-i18n-title');
+                if (translations[state.currentLang][key]) {
+                    el.title = translations[state.currentLang][key];
                 }
             });
             
@@ -1001,9 +1020,9 @@ If words look even and clean, the font works well.</textarea>
         };
 
         /** Custom Confirm Dialog **/
-        function showConfirm(message, title = '确认操作', onlyOk = false) {
+        function showConfirm(message, title = null, onlyOk = false) {
             return new Promise((resolve) => {
-                els.confirmTitle.textContent = title;
+                els.confirmTitle.textContent = title || t('confirmTitle');
                 els.confirmMessage.textContent = message;
                 els.confirmOverlay.classList.remove('hidden');
                 
@@ -1132,7 +1151,7 @@ If words look even and clean, the font works well.</textarea>
                 // Mobile reset all button
                 if (els.btnResetAllMobile) {
                     els.btnResetAllMobile.addEventListener('click', async () => {
-                        const confirmed = await showConfirm('确定要重置吗？这将清空您绘制的所有字母，此操作无法撤销！', '重置字库');
+                        const confirmed = await showConfirm(t('resetLibraryConfirm'), t('resetLibraryTitle'));
                         if(confirmed) {
                             state.library.chars = {};
                             saveLibrary();
@@ -1146,7 +1165,7 @@ If words look even and clean, the font works well.</textarea>
 
             // Library
             els.btnResetLib.addEventListener('click', async () => {
-                const confirmed = await showConfirm('确定要重置吗？这将清空您绘制的所有字母，此操作无法撤销！', '重置字库');
+                const confirmed = await showConfirm(t('resetLibraryConfirm'), t('resetLibraryTitle'));
                 if(confirmed) {
                     state.library.chars = {};
                     saveLibrary();
@@ -1221,7 +1240,7 @@ If words look even and clean, the font works well.</textarea>
             });
             
             els.btnResetPreviewText.addEventListener('click', async () => {
-                const confirmed = await showConfirm('确定要还原预览文字为初始内容吗？', '还原文字');
+                const confirmed = await showConfirm(t('restoreContentConfirm'), t('restoreContentTitle'));
                 if (confirmed) {
                     state.previewText = DEFAULT_PREVIEW_TEXT;
                     els.inputPreviewText.value = DEFAULT_PREVIEW_TEXT;
@@ -1363,7 +1382,10 @@ If words look even and clean, the font works well.</textarea>
                 // Reset category function
                 h3.onclick = async (e) => {
                     e.stopPropagation();
-                    const confirmed = await showConfirm(t('resetCategoryConfirm'), t('confirmTitle'));
+                    const confirmed = await showConfirm(
+                        t('resetCategoryConfirm').replace('{name}', title),
+                        t('resetCategoryTitle')
+                    );
                     if(confirmed) {
                         chars.forEach(char => {
                             delete state.library.chars[char];
@@ -1436,7 +1458,10 @@ If words look even and clean, the font works well.</textarea>
                     // Reset category function (same as desktop)
                     mobileTitle.onclick = async (e) => {
                         e.stopPropagation();
-                        const confirmed = await showConfirm(`确定要重置"${title}"中的所有字符吗？`, '重置分类');
+                        const confirmed = await showConfirm(
+                            t('resetCategoryConfirm').replace('{name}', title),
+                            t('resetCategoryTitle')
+                        );
                         if(confirmed) {
                             chars.forEach(char => {
                                 delete state.library.chars[char];
