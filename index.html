@@ -2136,31 +2136,47 @@ If words look even and clean, the font works well.</textarea>
                 // Convert image to path
                 const path = await convertImageToPath(charData.cropped || charData);
                 
+                const safeAdvance = (Number.isFinite(path.advanceWidth) && path.advanceWidth > 0)
+                    ? Math.round(path.advanceWidth)
+                    : 1000;
+
                 glyphs.push(new opentype.Glyph({
                     name: char,
                     unicode: unicode,
-                    advanceWidth: path.advanceWidth,
+                    advanceWidth: safeAdvance,
                     path: path.opentypePath
                 }));
             }
             
-            // Create font
+            // Create font — Windows requires ASCII postScriptName / family name,
+            // so derive an ASCII fallback and keep the original (possibly CJK) name
+            // as a localized display name.
+            const asciiName = (fontName.replace(/[^\x20-\x7E]/g, '').trim() || 'FontCraftFont');
+            const psName = asciiName.replace(/\s+/g, '') + '-Regular';
+
             const font = new opentype.Font({
-                familyName: fontName,
+                familyName: asciiName,
                 styleName: 'Regular',
                 unitsPerEm: 1000,
                 ascender: 750,
                 descender: -250,
                 glyphs: glyphs
             });
+
+            font.names.fontFamily = { en: asciiName, zh: fontName };
+            font.names.fullName = { en: asciiName + ' Regular', zh: fontName };
+            font.names.postScriptName = { en: psName };
+            font.names.uniqueID = { en: 'FontCraft ' + asciiName + ' ' + Date.now() };
+            font.names.version = { en: 'Version 1.000' };
             
-            // Download as TTF
+            // Download as TTF — sanitize filename for Windows (no \ / : * ? " < > |)
+            const safeFileName = (fontName.replace(/[\\/:*?"<>|]/g, '_').trim() || 'font');
             const arrayBuffer = font.toArrayBuffer();
             const blob = new Blob([arrayBuffer], { type: 'font/ttf' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `${fontName}.ttf`;
+            a.download = `${safeFileName}.ttf`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2174,6 +2190,12 @@ If words look even and clean, the font works well.</textarea>
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d', { willReadFrequently: true });
                     
+                    // Guard against zero-size images that would cause divide-by-zero
+                    // and produce NaN/Infinity coordinates -> corrupt TTF.
+                    if (!img.width || !img.height) {
+                        resolve({ opentypePath: new opentype.Path(), advanceWidth: 1000 });
+                        return;
+                    }
                     canvas.width = img.width;
                     canvas.height = img.height;
                     
